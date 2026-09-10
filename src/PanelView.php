@@ -117,7 +117,7 @@ final readonly class PanelView implements JsonSerializable
      */
     public function callout(Tone $tone, mixed ...$content): self
     {
-        return $this->append(self::paragraphBlock(array_values($content), $tone));
+        return $this->append(self::paragraphBlock($content, $tone));
     }
 
     /**
@@ -271,7 +271,7 @@ final readonly class PanelView implements JsonSerializable
      */
     public function paragraph(mixed ...$content): self
     {
-        return $this->append(self::paragraphBlock(array_values($content), null));
+        return $this->append(self::paragraphBlock($content, null));
     }
 
     /**

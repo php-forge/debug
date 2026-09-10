@@ -6,11 +6,15 @@ namespace PHPForge\Debug\Tests;
 
 use InvalidArgumentException;
 use PHPForge\Debug\{ColumnStyle, PanelView, Tone};
+use PHPForge\Debug\Tests\Provider\InlineScalarProvider;
+use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 
 /**
  * Unit tests for the validated shapes {@see PanelView} exports to the host renderer.
+ *
+ * {@see InlineScalarProvider} for test case data providers.
  */
 final class PanelViewTest extends TestCase
 {
@@ -113,6 +117,72 @@ final class PanelViewTest extends TestCase
             ],
             $view->blocks(),
             'Overview fields must reuse the metric shape.',
+        );
+    }
+
+    /**
+     * @param array{kind: 'text', value: string, style: 'plain'} $expected
+     */
+    #[DataProviderExternal(InlineScalarProvider::class, 'plainText')]
+    public function testScalarContentBecomesPlainInlineText(mixed $value, array $expected): void
+    {
+        self::assertSame(
+            [['kind' => 'paragraph', 'content' => [$expected], 'tone' => null]],
+            PanelView::create()->paragraph($value)->blocks(),
+            'Conversion must keep the literal and the plain style.',
+        );
+        self::assertSame(
+            [
+                [
+                    'kind' => 'overview',
+                    'fields' => [['label' => 'Field', 'value' => $expected]],
+                    'compact' => false,
+                ],
+            ],
+            PanelView::create()->overview(['Field' => $value])->blocks(),
+            'Overview fields must convert identically.',
+        );
+    }
+
+    public function testStringKeyedSpreadContentStaysAList(): void
+    {
+        $parts = ['first' => 'A', 'second' => PanelView::code('B')];
+
+        $content = [PanelView::text('A'), PanelView::code('B')];
+
+        self::assertSame(
+            [['kind' => 'paragraph', 'content' => $content, 'tone' => null]],
+            PanelView::create()->paragraph(...$parts)->blocks(),
+            'String keys must not reach the paragraph content.',
+        );
+        self::assertSame(
+            [['kind' => 'paragraph', 'content' => $content, 'tone' => Tone::WARNING]],
+            PanelView::create()->callout(Tone::WARNING, ...$parts)->blocks(),
+            'String keys must not reach the callout content.',
+        );
+    }
+
+    public function testTableKeepsEveryStyledColumnUnderItsIndex(): void
+    {
+        $view = PanelView::create()
+            ->table(
+                ['Key', 'Value', 'Hits'],
+                [['home', 'cached', 3]],
+                styles: [0 => ColumnStyle::MONOSPACE, 2 => ColumnStyle::NUMBER],
+            );
+
+        self::assertSame(
+            [
+                [
+                    'kind' => 'table',
+                    'headers' => ['Key', 'Value', 'Hits'],
+                    'rows' => [[PanelView::text('home'), PanelView::text('cached'), PanelView::text('3')]],
+                    'styles' => [0 => ColumnStyle::MONOSPACE, 2 => ColumnStyle::NUMBER],
+                    'collapsible' => false,
+                ],
+            ],
+            $view->blocks(),
+            'Every styled column must survive, not only the first.',
         );
     }
 
