@@ -19,6 +19,12 @@ Run Rector to apply automated code refactoring.
 composer rector
 ```
 
+Validate Rector without modifying files.
+
+```bash
+composer rector -- --dry-run
+```
+
 ## Coding standards (ECS)
 
 Run Easy Coding Standard (ECS) and apply fixes.
@@ -80,3 +86,7 @@ Run PHPStan with a different memory limit.
 ```bash
 composer static -- --memory-limit=512M
 ```
+
+## Next steps
+
+- 📖 [Readme](../README.md)

@@ -1,16 +1,17 @@
 {
-    "name": "yii2-extensions/template",
+    "name": "php-forge/debug",
     "type": "library",
-    "description": "_____",
+    "description": "Framework-neutral contracts and declarative presentation models for debugger extensions.",
     "keywords": [
-        "_____"
+        "debug",
+        "interop",
+        "panel"
     ],
     "license": "BSD-3-Clause",
     "minimum-stability": "dev",
     "prefer-stable": true,
     "require": {
-        "php": ">=8.3",
-        "yiisoft/yii2": "^22"
+        "php": ">=8.3"
     },
     "require-dev": {
         "infection/infection": "^0.35",
@@ -20,29 +21,29 @@
         "phpstan/phpstan-phpunit": "^2.0",
         "phpstan/phpstan-strict-rules": "^2.0.3",
         "phpunit/phpunit": "^12.5",
-        "yii2-extensions/phpstan": "^0.4"
+        "psr/log": "^3.0",
+        "phpstan/phpstan": "^2.2"
     },
     "autoload": {
         "psr-4": {
-            "yii\\template\\": "src"
+            "PHPForge\\Debug\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "yii\\template\\tests\\": "tests"
+            "PHPForge\\Debug\\Tests\\": "tests/"
         }
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "1.0.x-dev"
+            "dev-main": "0.1.x-dev"
         }
     },
     "config": {
         "sort-packages": true,
         "allow-plugins": {
             "infection/extension-installer": true,
-            "phpstan/extension-installer": true,
-            "yiisoft/yii2-composer": true
+            "phpstan/extension-installer": true
         }
     },
     "scripts": {
