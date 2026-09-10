@@ -85,7 +85,7 @@ final class CachePanel extends Panel
     public function present(array $data): PanelView
     {
         $operations = is_array($data['operations'] ?? null) ? $data['operations'] : [];
-        
+
         $view = PanelView::create()
             ->summary(count($operations) === 1 ? ' operation' : ' operations', count($operations))
             ->toolbar('Cache', count($operations))
