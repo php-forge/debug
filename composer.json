@@ -3,8 +3,8 @@
     "type": "library",
     "description": "Framework-neutral contracts and declarative presentation models for debugger extensions.",
     "keywords": [
+        "collector",
         "debug",
-        "interop",
         "panel"
     ],
     "license": "BSD-3-Clause",
@@ -36,7 +36,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "0.1.x-dev"
+            "dev-main": "0.2.x-dev"
         }
     },
     "config": {

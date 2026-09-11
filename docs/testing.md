@@ -87,6 +87,6 @@ Run PHPStan with a different memory limit.
 composer static -- --memory-limit=512M
 ```
 
-## Next steps
+---
 
-- 📖 [Readme](../README.md)
+[← Back to documentation](../README.md#documentation)

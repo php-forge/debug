@@ -3,7 +3,7 @@
     <a href="https://github.com/php-forge/debug" target="_blank">
       <img src="https://avatars.githubusercontent.com/u/103309199?s=400&u=ca3561c692f53ed7eb290d3bb226a2828741606f&v=4" width="30%" alt="PHP Forge">
     </a>
-    <h1 align="center">Debug Interop</h1>
+    <h1 align="center">Debug</h1>
     <br>
 </p>
 <!-- markdownlint-enable MD041 -->
@@ -26,6 +26,17 @@
 <p align="center">
     <strong>Framework-neutral contracts for portable collectors and panels rendered by the debugger frontend.</strong>
 </p>
+
+## Installation
+
+```bash
+composer require php-forge/debug:^0.1
+```
+
+The package ships contracts and presentation models only. Its sole requirement is PHP 8.3: it pulls in no framework,
+HTML library, or debugger engine, and installing it activates nothing. A host such as
+[`php-forge/debug-core`](https://github.com/php-forge/debug-core) renders whatever an extension declares through these
+contracts.
 
 ## A complete panel in two classes
 
@@ -113,11 +124,13 @@ Merge these fragments into an application whose debugger is already enabled. The
 `ID` must match: that is how the host pairs a capture with its panel.
 
 ```php
-// Yii2: inside the YII_ENV_DEV guard, preserving the existing module settings.
-$collector = new CacheCollector();
-
-$config['modules']['debug']['collectors'][] = $collector;
-$config['modules']['debug']['panels'][] = new CachePanel();
+// Yii2: inside the YII_DEBUG guard. Declare 'modules' => [] in the application configuration so the offset stays
+// typed under PHPStan level max; the guard then only fills in the debug entry.
+$config['modules']['debug'] = [
+    'class' => DebugModule::class,
+    'collectors' => ['cache-operations' => new CacheCollector()],
+    'panels' => ['cache-operations' => new CachePanel()],
+];
 ```
 
 ```php
@@ -129,8 +142,9 @@ $registry = $registry
     ->withPanel(new CachePanel());
 ```
 
-Both hosts derive the IDs and wrap the portable objects internally. No catalog entry, icon enum, storage dispatch
-entry, or change to an official package is needed. Inject the same `$collector` into the application service that
+Both hosts derive the IDs from the objects themselves. `CollectorInterface` is the only collector contract the
+debugger has, so the collector is registered as it is, and only the panel is adapted to the host's own panel type.
+No catalog entry, icon enum, storage dispatch entry, or change to an official package is needed. Inject the same `$collector` into the application service that
 calls `record()`.
 
 A runnable version of this example, capturing through PSR-3 instead of a direct call, lives in
@@ -164,9 +178,9 @@ Plain scalars and `null` become text. `PanelView::text()`, `::strong()`, `::code
 arguments and rejects invalid input with an explicit `InvalidArgumentException`. The host reads the finished
 description through `summaryMetrics()`, `toolbarMetrics()`, `blocks()`, and `isActive()`.
 
-## Verification
+## Documentation
 
-[docs/testing.md](docs/testing.md) lists the Composer scripts and the two isolated-consumer checks.
+- [Testing guide](docs/testing.md)
 
 ## Package information
 
