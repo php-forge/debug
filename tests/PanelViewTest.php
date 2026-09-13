@@ -306,13 +306,13 @@ final class PanelViewTest extends TestCase
 
         PanelView::create()
             ->paragraph(
-            [
-                'kind' => 'link',
-                'label' => 'Open',
-                'href' => 'javascript:alert(1)',
-                'external' => false,
-            ],
-        );
+                [
+                    'kind' => 'link',
+                    'label' => 'Open',
+                    'href' => 'javascript:alert(1)',
+                    'external' => false,
+                ],
+            );
     }
 
     public function testThrowInvalidArgumentExceptionForForgedInlineValue(): void
