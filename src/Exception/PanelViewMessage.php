@@ -9,7 +9,7 @@ use function sprintf;
 /**
  * Exception message templates authored by this package.
  *
- * Use {@see PanelViewPanelViewMessage::getMessage()} to format a template with `sprintf()` arguments.
+ * Use {@see PanelViewMessage::getMessage()} to format a template with `sprintf()` arguments.
  */
 enum PanelViewMessage: string
 {
