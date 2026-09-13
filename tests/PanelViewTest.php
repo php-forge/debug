@@ -6,6 +6,7 @@ namespace PHPForge\Debug\Tests;
 
 use InvalidArgumentException;
 use PHPForge\Debug\{ColumnStyle, PanelView, Tone};
+use PHPForge\Debug\Exception\Message;
 use PHPForge\Debug\Tests\Provider\{InlineScalarProvider, LinkTargetProvider};
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
@@ -262,10 +263,24 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel paragraphs must be scalars, inline values, or lists of them.',
+            Message::PARAGRAPH_CONTENT_INVALID->getMessage(),
         );
 
         PanelView::create()->emptyState('Empty', ['first' => 'A']);
+    }
+
+    #[DataProviderExternal(LinkTargetProvider::class, 'normalized')]
+    public function testThrowInvalidArgumentExceptionForBrowserNormalizedLinkTarget(string $href): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            Message::LINK_TARGET_NORMALIZED->getMessage(),
+        );
+
+        PanelView::link(
+            'Open',
+            $href,
+        );
     }
 
     #[DataProviderExternal(LinkTargetProvider::class, 'rejected')]
@@ -273,21 +288,30 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            "Debug panel links must be relative or use the http, https, or mailto scheme. Got {$scheme}.",
+            Message::LINK_TARGET_SCHEME_INVALID->getMessage($scheme),
         );
 
-        PanelView::link('Open', $href);
+        PanelView::link(
+            'Open',
+            $href,
+        );
     }
 
     public function testThrowInvalidArgumentExceptionForForgedExecutableLink(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel links must be relative or use the http, https, or mailto scheme. Got javascript.',
+            Message::LINK_TARGET_SCHEME_INVALID->getMessage('javascript'),
         );
 
-        PanelView::create()->paragraph(
-            ['kind' => 'link', 'label' => 'Open', 'href' => 'javascript:alert(1)', 'external' => false],
+        PanelView::create()
+            ->paragraph(
+            [
+                'kind' => 'link',
+                'label' => 'Open',
+                'href' => 'javascript:alert(1)',
+                'external' => false,
+            ],
         );
     }
 
@@ -295,7 +319,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel inline content must be a scalar, null, or a PanelView inline value. Got array.',
+            Message::INLINE_CONTENT_INVALID->getMessage('array'),
         );
 
         PanelView::create()->paragraph(['kind' => 'text']);
@@ -305,7 +329,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel trace frames must be arrays of frame fields.',
+            Message::TRACE_FRAME_INVALID->getMessage(),
         );
 
         PanelView::trace(['not a frame']);
@@ -315,7 +339,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel column styles must be ' . ColumnStyle::class . ' cases.',
+            Message::COLUMN_STYLE_INVALID->getMessage(ColumnStyle::class),
         );
 
         PanelView::create()->table(['One'], [['a']], styles: [0 => 'pill']);
@@ -325,7 +349,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel inline content must be a scalar, null, or a PanelView inline value. Got stdClass.',
+            Message::INLINE_CONTENT_INVALID->getMessage('stdClass'),
         );
 
         PanelView::create()->paragraph(new stdClass());
@@ -335,7 +359,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel table rows must be lists whose width matches the headers.',
+            Message::TABLE_ROW_WIDTH_INVALID->getMessage(),
         );
 
         PanelView::create()->table(['One'], ['not a row']);
@@ -345,7 +369,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel table headers must be plain strings.',
+            Message::TABLE_HEADER_INVALID->getMessage(),
         );
 
         PanelView::create()->table([1], [[1]]);
@@ -355,7 +379,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel table rows must be lists whose width matches the headers.',
+            Message::TABLE_ROW_WIDTH_INVALID->getMessage(),
         );
 
         PanelView::create()->table(['One'], [[]]);
@@ -365,9 +389,22 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel column styles must be keyed by an existing column index.',
+            Message::COLUMN_STYLE_KEY_INVALID->getMessage(),
         );
 
         PanelView::create()->table(['One'], [['a']], styles: [1 => ColumnStyle::PILL]);
+    }
+
+    public function testThrowInvalidArgumentExceptionForUnparsableLinkTarget(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            Message::LINK_TARGET_UNPARSABLE->getMessage(),
+        );
+
+        PanelView::link(
+            'Open',
+            'http://:80',
+        );
     }
 }
