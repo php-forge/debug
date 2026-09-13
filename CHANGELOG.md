@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.1.2 Under development
 
+- fix(security): reject link targets a browser would normalize, and move exception messages to the `Exception\Message` enum.
+
 ## 0.1.1 September 13, 2026
 
 - feat(panel-view): add filterable tables, trace frames, safe links, and SQL text styling.

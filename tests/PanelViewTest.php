@@ -6,7 +6,7 @@ namespace PHPForge\Debug\Tests;
 
 use InvalidArgumentException;
 use PHPForge\Debug\{ColumnStyle, PanelView, Tone};
-use PHPForge\Debug\Exception\Message;
+use PHPForge\Debug\Exception\PanelViewMessage;
 use PHPForge\Debug\Tests\Provider\{InlineScalarProvider, LinkTargetProvider};
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
@@ -263,7 +263,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::PARAGRAPH_CONTENT_INVALID->getMessage(),
+            PanelViewMessage::PARAGRAPH_CONTENT_INVALID->getMessage(),
         );
 
         PanelView::create()->emptyState('Empty', ['first' => 'A']);
@@ -274,7 +274,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::LINK_TARGET_NORMALIZED->getMessage(),
+            PanelViewMessage::LINK_TARGET_NORMALIZED->getMessage(),
         );
 
         PanelView::link(
@@ -288,7 +288,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::LINK_TARGET_SCHEME_INVALID->getMessage($scheme),
+            PanelViewMessage::LINK_TARGET_SCHEME_INVALID->getMessage($scheme),
         );
 
         PanelView::link(
@@ -301,7 +301,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::LINK_TARGET_SCHEME_INVALID->getMessage('javascript'),
+            PanelViewMessage::LINK_TARGET_SCHEME_INVALID->getMessage('javascript'),
         );
 
         PanelView::create()
@@ -319,7 +319,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::INLINE_CONTENT_INVALID->getMessage('array'),
+            PanelViewMessage::INLINE_CONTENT_INVALID->getMessage('array'),
         );
 
         PanelView::create()->paragraph(['kind' => 'text']);
@@ -329,7 +329,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::TRACE_FRAME_INVALID->getMessage(),
+            PanelViewMessage::TRACE_FRAME_INVALID->getMessage(),
         );
 
         PanelView::trace(['not a frame']);
@@ -339,7 +339,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::COLUMN_STYLE_INVALID->getMessage(ColumnStyle::class),
+            PanelViewMessage::COLUMN_STYLE_INVALID->getMessage(ColumnStyle::class),
         );
 
         PanelView::create()->table(['One'], [['a']], styles: [0 => 'pill']);
@@ -349,7 +349,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::INLINE_CONTENT_INVALID->getMessage('stdClass'),
+            PanelViewMessage::INLINE_CONTENT_INVALID->getMessage('stdClass'),
         );
 
         PanelView::create()->paragraph(new stdClass());
@@ -359,7 +359,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::TABLE_ROW_WIDTH_INVALID->getMessage(),
+            PanelViewMessage::TABLE_ROW_WIDTH_INVALID->getMessage(),
         );
 
         PanelView::create()->table(['One'], ['not a row']);
@@ -369,7 +369,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::TABLE_HEADER_INVALID->getMessage(),
+            PanelViewMessage::TABLE_HEADER_INVALID->getMessage(),
         );
 
         PanelView::create()->table([1], [[1]]);
@@ -379,7 +379,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::TABLE_ROW_WIDTH_INVALID->getMessage(),
+            PanelViewMessage::TABLE_ROW_WIDTH_INVALID->getMessage(),
         );
 
         PanelView::create()->table(['One'], [[]]);
@@ -389,7 +389,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::COLUMN_STYLE_KEY_INVALID->getMessage(),
+            PanelViewMessage::COLUMN_STYLE_KEY_INVALID->getMessage(),
         );
 
         PanelView::create()->table(['One'], [['a']], styles: [1 => ColumnStyle::PILL]);
@@ -399,7 +399,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            Message::LINK_TARGET_UNPARSABLE->getMessage(),
+            PanelViewMessage::LINK_TARGET_UNPARSABLE->getMessage(),
         );
 
         PanelView::link(

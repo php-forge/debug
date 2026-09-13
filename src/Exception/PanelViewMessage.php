@@ -9,9 +9,9 @@ use function sprintf;
 /**
  * Exception message templates authored by this package.
  *
- * Use {@see Message::getMessage()} to format a template with `sprintf()` arguments.
+ * Use {@see PanelViewMessage::getMessage()} to format a template with `sprintf()` arguments.
  */
-enum Message: string
+enum PanelViewMessage: string
 {
     /**
      * Indicates that a column style is not a {@see \PHPForge\Debug\ColumnStyle} case.
