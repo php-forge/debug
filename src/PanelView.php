@@ -6,7 +6,7 @@ namespace PHPForge\Debug;
 
 use InvalidArgumentException;
 use JsonSerializable;
-use PHPForge\Debug\Exception\Message;
+use PHPForge\Debug\Exception\PanelViewMessage;
 
 use function count;
 use function in_array;
@@ -491,7 +491,7 @@ final readonly class PanelView implements JsonSerializable
         foreach ($frames as $frame) {
             if (is_array($frame) === false) {
                 throw new InvalidArgumentException(
-                    Message::TRACE_FRAME_INVALID->getMessage(),
+                    PanelViewMessage::TRACE_FRAME_INVALID->getMessage(),
                 );
             }
 
@@ -560,7 +560,7 @@ final readonly class PanelView implements JsonSerializable
         foreach ($headers as $header) {
             if (is_string($header) === false) {
                 throw new InvalidArgumentException(
-                    Message::TABLE_HEADER_INVALID->getMessage(),
+                    PanelViewMessage::TABLE_HEADER_INVALID->getMessage(),
                 );
             }
 
@@ -699,7 +699,7 @@ final readonly class PanelView implements JsonSerializable
 
         if (array_is_list($paragraph) === false) {
             throw new InvalidArgumentException(
-                Message::PARAGRAPH_CONTENT_INVALID->getMessage(),
+                PanelViewMessage::PARAGRAPH_CONTENT_INVALID->getMessage(),
             );
         }
 
@@ -723,7 +723,7 @@ final readonly class PanelView implements JsonSerializable
         foreach ($rows as $row) {
             if (is_array($row) === false || array_is_list($row) === false || count($row) !== $columns) {
                 throw new InvalidArgumentException(
-                    Message::TABLE_ROW_WIDTH_INVALID->getMessage(),
+                    PanelViewMessage::TABLE_ROW_WIDTH_INVALID->getMessage(),
                 );
             }
 
@@ -756,13 +756,13 @@ final readonly class PanelView implements JsonSerializable
         foreach ($styles as $column => $style) {
             if (is_int($column) === false || $column < 0 || $column >= $columns) {
                 throw new InvalidArgumentException(
-                    Message::COLUMN_STYLE_KEY_INVALID->getMessage(),
+                    PanelViewMessage::COLUMN_STYLE_KEY_INVALID->getMessage(),
                 );
             }
 
             if ($style instanceof ColumnStyle === false) {
                 throw new InvalidArgumentException(
-                    Message::COLUMN_STYLE_INVALID->getMessage(ColumnStyle::class),
+                    PanelViewMessage::COLUMN_STYLE_INVALID->getMessage(ColumnStyle::class),
                 );
             }
 
@@ -789,7 +789,7 @@ final readonly class PanelView implements JsonSerializable
     {
         if (strpbrk($href, "\t\n\r") !== false || trim($href, "\x00..\x20") !== $href) {
             throw new InvalidArgumentException(
-                Message::LINK_TARGET_NORMALIZED->getMessage(),
+                PanelViewMessage::LINK_TARGET_NORMALIZED->getMessage(),
             );
         }
 
@@ -797,7 +797,7 @@ final readonly class PanelView implements JsonSerializable
 
         if ($parts === false) {
             throw new InvalidArgumentException(
-                Message::LINK_TARGET_UNPARSABLE->getMessage(),
+                PanelViewMessage::LINK_TARGET_UNPARSABLE->getMessage(),
             );
         }
 
@@ -805,7 +805,7 @@ final readonly class PanelView implements JsonSerializable
 
         if ($scheme !== null && in_array(strtolower($scheme), ['http', 'https', 'mailto'], true) === false) {
             throw new InvalidArgumentException(
-                Message::LINK_TARGET_SCHEME_INVALID->getMessage($scheme),
+                PanelViewMessage::LINK_TARGET_SCHEME_INVALID->getMessage($scheme),
             );
         }
 
@@ -822,7 +822,7 @@ final readonly class PanelView implements JsonSerializable
     private static function unsupportedInline(mixed $value): InvalidArgumentException
     {
         return new InvalidArgumentException(
-            Message::INLINE_CONTENT_INVALID->getMessage(get_debug_type($value)),
+            PanelViewMessage::INLINE_CONTENT_INVALID->getMessage(get_debug_type($value)),
         );
     }
 }
