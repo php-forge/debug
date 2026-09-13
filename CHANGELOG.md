@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.1.1 Under development
 
+- feat(panel-view): add filterable tables, trace frames, safe links, and SQL text styling.
+
 ## 0.1.0 September 11, 2026
 
 - feat: initial development release.

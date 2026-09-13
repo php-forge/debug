@@ -66,6 +66,7 @@ final class FluentPanelViewTest extends TestCase
                     ],
                     'styles' => [0 => ColumnStyle::MONOSPACE],
                     'collapsible' => true,
+                    'filterable' => false,
                 ],
                 [
                     'kind' => 'paragraph',

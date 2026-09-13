@@ -8,10 +8,13 @@ use InvalidArgumentException;
 use JsonSerializable;
 
 use function count;
+use function in_array;
 use function is_array;
 use function is_float;
 use function is_int;
 use function is_string;
+use function preg_match;
+use function strtolower;
 
 /**
  * Builds immutable panel descriptions without exposing the host's markup or styles.
@@ -24,9 +27,11 @@ use function is_string;
  * and {@see self::isActive()}. Nothing outside this class can build or alter a shape.
  *
  * @phpstan-type BadgeInline array{kind: 'badge', label: string, tone: Tone}
- * @phpstan-type TextInline array{kind: 'text', value: string, style: 'code'|'plain'|'preview'|'strong'}
+ * @phpstan-type LinkInline array{kind: 'link', label: string, href: string, external: bool}
+ * @phpstan-type TextInline array{kind: 'text', value: string, style: 'code'|'plain'|'preview'|'sql'|'strong'}
+ * @phpstan-type TraceInline array{kind: 'trace', frames: list<array<string, mixed>>}
  * @phpstan-type ValueInline array{kind: 'value', value: mixed, typeOnly: bool}
- * @phpstan-type Inline BadgeInline|TextInline|ValueInline
+ * @phpstan-type Inline BadgeInline|LinkInline|TextInline|TraceInline|ValueInline
  * @phpstan-type Pair array{label: string, value: Inline}
  * @phpstan-type TextPair array{label: string, value: TextInline}
  * @phpstan-type EmptyStateBlock array{kind: 'emptyState', title: string, paragraphs: list<ParagraphBlock>}
@@ -38,7 +43,8 @@ use function is_string;
  *   headers: list<string>,
  *   rows: list<list<Inline>>,
  *   styles: array<int, ColumnStyle>,
- *   collapsible: bool
+ *   collapsible: bool,
+ *   filterable: bool
  * }
  * @phpstan-type Block array{
  *   kind: 'disclosure',
@@ -238,6 +244,30 @@ final readonly class PanelView implements JsonSerializable
     }
 
     /**
+     * Creates an inline navigation link the host renders as an anchor.
+     *
+     * Only relative targets and the `http`, `https`, and `mailto` schemes are accepted, so a captured value can never
+     * turn into an executable target.
+     *
+     * @param string $label Link text; the host escapes it.
+     * @param string $href Relative target, or an absolute `http`, `https`, or `mailto` URL.
+     * @param bool $external Whether the host opens the target in a new browsing context.
+     *
+     * @throws InvalidArgumentException If the target declares a scheme the host must not follow.
+     *
+     * @return LinkInline Inline link accepted by every content method.
+     */
+    public static function link(string $label, string $href, bool $external = false): array
+    {
+        return [
+            'kind' => 'link',
+            'label' => $label,
+            'href' => self::target($href),
+            'external' => $external,
+        ];
+    }
+
+    /**
      * Appends labeled overview fields, using array keys as labels.
      *
      * Labels are unique because they are array keys; repeat a value under a different label instead.
@@ -287,6 +317,22 @@ final readonly class PanelView implements JsonSerializable
             'kind' => 'text',
             'value' => $value,
             'style' => 'preview',
+        ];
+    }
+
+    /**
+     * Creates inline text the host highlights as an SQL statement.
+     *
+     * @param string $value Statement text; the host escapes it.
+     *
+     * @return TextInline Inline text accepted by every content method.
+     */
+    public static function sql(string $value): array
+    {
+        return [
+            'kind' => 'text',
+            'value' => $value,
+            'style' => 'sql',
         ];
     }
 
@@ -347,13 +393,19 @@ final readonly class PanelView implements JsonSerializable
      * @param array<array-key, mixed> $rows Rows of inline or plain values in display order.
      * @param bool $collapsible Whether the host may collapse the table.
      * @param array<array-key, mixed> $styles Optional {@see ColumnStyle} cases keyed by column index.
+     * @param bool $filterable Whether to request the host's in-place row filter for the table.
      *
      * @throws InvalidArgumentException If a header, row width, cell, or column style is invalid.
      *
      * @return self New view with the table appended.
      */
-    public function table(array $headers, array $rows, bool $collapsible = false, array $styles = []): self
-    {
+    public function table(
+        array $headers,
+        array $rows,
+        bool $collapsible = false,
+        array $styles = [],
+        bool $filterable = false,
+    ): self {
         $columns = self::headers($headers);
 
         return $this->append(
@@ -363,9 +415,11 @@ final readonly class PanelView implements JsonSerializable
                 'rows' => self::rows($rows, count($columns)),
                 'styles' => self::styles($styles, count($columns)),
                 'collapsible' => $collapsible,
+                'filterable' => $filterable,
             ],
         );
     }
+
 
     /**
      * Creates plain inline text.
@@ -414,6 +468,43 @@ final readonly class PanelView implements JsonSerializable
     public function toolbarMetrics(): array
     {
         return $this->toolbar;
+    }
+
+    /**
+     * Creates the captured source frames of a call site, which the host renders through its own frame renderer.
+     *
+     * Frames travel as captured data, never as markup, so the host keeps ownership of the source-link format.
+     *
+     * @param array<array-key, mixed> $frames Captured frames in call order, each an array of frame fields.
+     *
+     * @throws InvalidArgumentException If a frame is not an array of fields.
+     *
+     * @return TraceInline Inline trace accepted by every content method.
+     */
+    public static function trace(array $frames): array
+    {
+        $captured = [];
+
+        foreach ($frames as $frame) {
+            if (is_array($frame) === false) {
+                throw new InvalidArgumentException(
+                    'Debug panel trace frames must be arrays of frame fields.',
+                );
+            }
+
+            $fields = [];
+
+            foreach ($frame as $key => $value) {
+                $fields[(string) $key] = $value;
+            }
+
+            $captured[] = $fields;
+        }
+
+        return [
+            'kind' => 'trace',
+            'frames' => $captured,
+        ];
     }
 
     /**
@@ -517,15 +608,37 @@ final readonly class PanelView implements JsonSerializable
             return ['kind' => 'badge', 'label' => $label, 'tone' => $tone];
         }
 
+        $href = $value['href'] ?? null;
+        $external = $value['external'] ?? null;
+
+        if ($kind === 'link' && is_string($label) && is_string($href) && is_bool($external)) {
+            return [
+                'kind' => 'link',
+                'label' => $label,
+                'href' => self::target($href),
+                'external' => $external,
+            ];
+        }
+
         $text = $value['value'] ?? null;
         $style = $value['style'] ?? null;
 
-        if ($kind === 'text' && is_string($text) && in_array($style, ['code', 'plain', 'preview', 'strong'], true)) {
+        if (
+            $kind === 'text'
+            && is_string($text)
+            && in_array($style, ['code', 'plain', 'preview', 'sql', 'strong'], true)
+        ) {
             return [
                 'kind' => 'text',
                 'value' => $text,
                 'style' => $style,
             ];
+        }
+
+        $frames = $value['frames'] ?? null;
+
+        if ($kind === 'trace' && is_array($frames)) {
+            return self::trace($frames);
         }
 
         $typeOnly = $value['typeOnly'] ?? null;
@@ -654,6 +767,29 @@ final readonly class PanelView implements JsonSerializable
         }
 
         return $result;
+    }
+
+    /**
+     * Rejects a link target the host must not follow.
+     *
+     * @param string $href Candidate target.
+     *
+     * @throws InvalidArgumentException If the target declares a scheme other than `http`, `https`, or `mailto`.
+     *
+     * @return string Unmodified target.
+     */
+    private static function target(string $href): string
+    {
+        $scheme = [];
+
+        if (preg_match('/^([A-Za-z][A-Za-z0-9+.\-]*):/', $href, $scheme) === 1
+            && in_array(strtolower($scheme[1]), ['http', 'https', 'mailto'], true) === false) {
+            throw new InvalidArgumentException(
+                "Debug panel links must be relative or use the http, https, or mailto scheme. Got {$scheme[1]}.",
+            );
+        }
+
+        return $href;
     }
 
     /**
