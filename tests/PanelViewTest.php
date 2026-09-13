@@ -6,7 +6,8 @@ namespace PHPForge\Debug\Tests;
 
 use InvalidArgumentException;
 use PHPForge\Debug\{ColumnStyle, PanelView, Tone};
-use PHPForge\Debug\Tests\Provider\InlineScalarProvider;
+use PHPForge\Debug\Exception\Message;
+use PHPForge\Debug\Tests\Provider\{InlineScalarProvider, LinkTargetProvider};
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
 use stdClass;
@@ -14,7 +15,7 @@ use stdClass;
 /**
  * Unit tests for the validated shapes {@see PanelView} exports to the host renderer.
  *
- * {@see InlineScalarProvider} for test case data providers.
+ * {@see InlineScalarProvider} and {@see LinkTargetProvider} for test case data providers.
  */
 final class PanelViewTest extends TestCase
 {
@@ -33,10 +34,40 @@ final class PanelViewTest extends TestCase
             [
                 ['kind' => 'heading', 'title' => 'Title', 'section' => false],
                 ['kind' => 'overview', 'fields' => [], 'compact' => false],
-                ['kind' => 'table', 'headers' => [], 'rows' => [], 'styles' => [], 'collapsible' => false],
+                [
+                    'kind' => 'table',
+                    'headers' => [],
+                    'rows' => [],
+                    'styles' => [],
+                    'collapsible' => false,
+                    'filterable' => false,
+                ],
             ],
             $view->blocks(),
             'Every presentation hint must stay opt-in.',
+        );
+    }
+
+    public function testForgedSqlAndTraceValuesSurviveTheInlineRebuild(): void
+    {
+        self::assertSame(
+            [
+                [
+                    'kind' => 'paragraph',
+                    'content' => [
+                        ['kind' => 'text', 'value' => 'SELECT 1', 'style' => 'sql'],
+                        ['kind' => 'trace', 'frames' => [['file' => '/app/x.php']]],
+                    ],
+                    'tone' => null,
+                ],
+            ],
+            PanelView::create()
+                ->paragraph(
+                    ['kind' => 'text', 'value' => 'SELECT 1', 'style' => 'sql'],
+                    ['kind' => 'trace', 'frames' => [['file' => '/app/x.php']]],
+                )
+                ->blocks(),
+            'Both new inline values must survive the rebuild unchanged.',
         );
     }
 
@@ -81,6 +112,47 @@ final class PanelViewTest extends TestCase
             ['kind' => 'value', 'value' => null, 'typeOnly' => true],
             PanelView::value(null, typeOnly: true),
             'Type-only presentation must be explicit.',
+        );
+        self::assertSame(
+            ['kind' => 'link', 'label' => 'View full phpinfo', 'href' => '/debug/php-info', 'external' => false],
+            PanelView::link('View full phpinfo', '/debug/php-info'),
+            'Links must stay in the same browsing context by default.',
+        );
+        self::assertSame(
+            ['kind' => 'link', 'label' => 'Docs', 'href' => 'https://example.test/d', 'external' => true],
+            PanelView::link('Docs', 'https://example.test/d', true),
+            'A new browsing context must be requested explicitly.',
+        );
+        self::assertSame(
+            ['kind' => 'text', 'value' => 'SELECT 1', 'style' => 'sql'],
+            PanelView::sql('SELECT 1'),
+            'Statement highlighting must be requested explicitly.',
+        );
+        self::assertSame(
+            ['kind' => 'trace', 'frames' => [['file' => '/app/x.php', 'line' => 7], ['0' => 'bare']]],
+            PanelView::trace([['file' => '/app/x.php', 'line' => 7], ['bare']]),
+            'Frames must travel as captured fields, with keys normalized to strings.',
+        );
+    }
+
+    #[DataProviderExternal(LinkTargetProvider::class, 'accepted')]
+    public function testLinkTargetsWithoutAnExecutableSchemeAreAccepted(string $href): void
+    {
+        self::assertSame(
+            [
+                [
+                    'kind' => 'overview',
+                    'fields' => [
+                        [
+                            'label' => 'Target',
+                            'value' => ['kind' => 'link', 'label' => 'Open', 'href' => $href, 'external' => false],
+                        ],
+                    ],
+                    'compact' => false,
+                ],
+            ],
+            PanelView::create()->overview(['Target' => PanelView::link('Open', $href)])->blocks(),
+            'An accepted target must travel unmodified.',
         );
     }
 
@@ -179,6 +251,7 @@ final class PanelViewTest extends TestCase
                     'rows' => [[PanelView::text('home'), PanelView::text('cached'), PanelView::text('3')]],
                     'styles' => [0 => ColumnStyle::MONOSPACE, 2 => ColumnStyle::NUMBER],
                     'collapsible' => false,
+                    'filterable' => false,
                 ],
             ],
             $view->blocks(),
@@ -190,27 +263,83 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel paragraphs must be scalars, inline values, or lists of them.',
+            Message::PARAGRAPH_CONTENT_INVALID->getMessage(),
         );
 
         PanelView::create()->emptyState('Empty', ['first' => 'A']);
+    }
+
+    #[DataProviderExternal(LinkTargetProvider::class, 'normalized')]
+    public function testThrowInvalidArgumentExceptionForBrowserNormalizedLinkTarget(string $href): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            Message::LINK_TARGET_NORMALIZED->getMessage(),
+        );
+
+        PanelView::link(
+            'Open',
+            $href,
+        );
+    }
+
+    #[DataProviderExternal(LinkTargetProvider::class, 'rejected')]
+    public function testThrowInvalidArgumentExceptionForExecutableLinkTarget(string $href, string $scheme): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            Message::LINK_TARGET_SCHEME_INVALID->getMessage($scheme),
+        );
+
+        PanelView::link(
+            'Open',
+            $href,
+        );
+    }
+
+    public function testThrowInvalidArgumentExceptionForForgedExecutableLink(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            Message::LINK_TARGET_SCHEME_INVALID->getMessage('javascript'),
+        );
+
+        PanelView::create()
+            ->paragraph(
+                [
+                    'kind' => 'link',
+                    'label' => 'Open',
+                    'href' => 'javascript:alert(1)',
+                    'external' => false,
+                ],
+            );
     }
 
     public function testThrowInvalidArgumentExceptionForForgedInlineValue(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel inline content must be a scalar, null, or a PanelView inline value. Got array.',
+            Message::INLINE_CONTENT_INVALID->getMessage('array'),
         );
 
         PanelView::create()->paragraph(['kind' => 'text']);
+    }
+
+    public function testThrowInvalidArgumentExceptionForNonArrayTraceFrame(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            Message::TRACE_FRAME_INVALID->getMessage(),
+        );
+
+        PanelView::trace(['not a frame']);
     }
 
     public function testThrowInvalidArgumentExceptionForNonColumnStyle(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel column styles must be ' . ColumnStyle::class . ' cases.',
+            Message::COLUMN_STYLE_INVALID->getMessage(ColumnStyle::class),
         );
 
         PanelView::create()->table(['One'], [['a']], styles: [0 => 'pill']);
@@ -220,7 +349,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel inline content must be a scalar, null, or a PanelView inline value. Got stdClass.',
+            Message::INLINE_CONTENT_INVALID->getMessage('stdClass'),
         );
 
         PanelView::create()->paragraph(new stdClass());
@@ -230,7 +359,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel table rows must be lists whose width matches the headers.',
+            Message::TABLE_ROW_WIDTH_INVALID->getMessage(),
         );
 
         PanelView::create()->table(['One'], ['not a row']);
@@ -240,7 +369,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel table headers must be plain strings.',
+            Message::TABLE_HEADER_INVALID->getMessage(),
         );
 
         PanelView::create()->table([1], [[1]]);
@@ -250,7 +379,7 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel table rows must be lists whose width matches the headers.',
+            Message::TABLE_ROW_WIDTH_INVALID->getMessage(),
         );
 
         PanelView::create()->table(['One'], [[]]);
@@ -260,9 +389,22 @@ final class PanelViewTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Debug panel column styles must be keyed by an existing column index.',
+            Message::COLUMN_STYLE_KEY_INVALID->getMessage(),
         );
 
         PanelView::create()->table(['One'], [['a']], styles: [1 => ColumnStyle::PILL]);
+    }
+
+    public function testThrowInvalidArgumentExceptionForUnparsableLinkTarget(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            Message::LINK_TARGET_UNPARSABLE->getMessage(),
+        );
+
+        PanelView::link(
+            'Open',
+            'http://:80',
+        );
     }
 }

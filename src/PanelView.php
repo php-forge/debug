@@ -6,12 +6,18 @@ namespace PHPForge\Debug;
 
 use InvalidArgumentException;
 use JsonSerializable;
+use PHPForge\Debug\Exception\Message;
 
 use function count;
+use function in_array;
 use function is_array;
 use function is_float;
 use function is_int;
 use function is_string;
+use function parse_url;
+use function strpbrk;
+use function strtolower;
+use function trim;
 
 /**
  * Builds immutable panel descriptions without exposing the host's markup or styles.
@@ -24,9 +30,11 @@ use function is_string;
  * and {@see self::isActive()}. Nothing outside this class can build or alter a shape.
  *
  * @phpstan-type BadgeInline array{kind: 'badge', label: string, tone: Tone}
- * @phpstan-type TextInline array{kind: 'text', value: string, style: 'code'|'plain'|'preview'|'strong'}
+ * @phpstan-type LinkInline array{kind: 'link', label: string, href: string, external: bool}
+ * @phpstan-type TextInline array{kind: 'text', value: string, style: 'code'|'plain'|'preview'|'sql'|'strong'}
+ * @phpstan-type TraceInline array{kind: 'trace', frames: list<array<string, mixed>>}
  * @phpstan-type ValueInline array{kind: 'value', value: mixed, typeOnly: bool}
- * @phpstan-type Inline BadgeInline|TextInline|ValueInline
+ * @phpstan-type Inline BadgeInline|LinkInline|TextInline|TraceInline|ValueInline
  * @phpstan-type Pair array{label: string, value: Inline}
  * @phpstan-type TextPair array{label: string, value: TextInline}
  * @phpstan-type EmptyStateBlock array{kind: 'emptyState', title: string, paragraphs: list<ParagraphBlock>}
@@ -38,7 +46,8 @@ use function is_string;
  *   headers: list<string>,
  *   rows: list<list<Inline>>,
  *   styles: array<int, ColumnStyle>,
- *   collapsible: bool
+ *   collapsible: bool,
+ *   filterable: bool
  * }
  * @phpstan-type Block array{
  *   kind: 'disclosure',
@@ -111,7 +120,7 @@ final readonly class PanelView implements JsonSerializable
      * @param Tone $tone Callout tone interpreted by the host frontend.
      * @param mixed ...$content Ordered factory-produced inline values, scalars, or `null`.
      *
-     * @throws InvalidArgumentException If an argument is not an accepted inline value.
+     * @throws InvalidArgumentException if an argument is not an accepted inline value.
      *
      * @return self New view with the callout appended.
      */
@@ -171,7 +180,7 @@ final readonly class PanelView implements JsonSerializable
      * @param mixed ...$paragraphs Ordered explanations, each one paragraph: a scalar, a factory-produced inline value,
      * or a list of inline values and scalars.
      *
-     * @throws InvalidArgumentException If a paragraph is neither an inline value nor a list of them.
+     * @throws InvalidArgumentException if a paragraph is neither an inline value nor a list of them.
      *
      * @return self New view with the empty state appended.
      */
@@ -238,6 +247,30 @@ final readonly class PanelView implements JsonSerializable
     }
 
     /**
+     * Creates an inline navigation link the host renders as an anchor.
+     *
+     * Only relative targets and the `http`, `https`, and `mailto` schemes are accepted, so a captured value can never
+     * turn into an executable target.
+     *
+     * @param string $label Link text; the host escapes it.
+     * @param string $href Relative target, or an absolute `http`, `https`, or `mailto` URL.
+     * @param bool $external Whether the host opens the target in a new browsing context.
+     *
+     * @throws InvalidArgumentException if the target declares a scheme the host must not follow.
+     *
+     * @return LinkInline Inline link accepted by every content method.
+     */
+    public static function link(string $label, string $href, bool $external = false): array
+    {
+        return [
+            'kind' => 'link',
+            'label' => $label,
+            'href' => self::target($href),
+            'external' => $external,
+        ];
+    }
+
+    /**
      * Appends labeled overview fields, using array keys as labels.
      *
      * Labels are unique because they are array keys; repeat a value under a different label instead.
@@ -245,7 +278,7 @@ final readonly class PanelView implements JsonSerializable
      * @param array<array-key, mixed> $values Labeled values in display order, each an inline value or a scalar.
      * @param bool $compact Whether to request compact presentation from the host.
      *
-     * @throws InvalidArgumentException If a value is not an accepted inline value.
+     * @throws InvalidArgumentException if a value is not an accepted inline value.
      *
      * @return self New view with the overview appended.
      */
@@ -265,7 +298,7 @@ final readonly class PanelView implements JsonSerializable
      *
      * @param mixed ...$content Ordered factory-produced inline values, scalars, or `null`.
      *
-     * @throws InvalidArgumentException If an argument is not an accepted inline value.
+     * @throws InvalidArgumentException if an argument is not an accepted inline value.
      *
      * @return self New view with the paragraph appended.
      */
@@ -287,6 +320,22 @@ final readonly class PanelView implements JsonSerializable
             'kind' => 'text',
             'value' => $value,
             'style' => 'preview',
+        ];
+    }
+
+    /**
+     * Creates inline text the host highlights as an SQL statement.
+     *
+     * @param string $value Statement text; the host escapes it.
+     *
+     * @return TextInline Inline text accepted by every content method.
+     */
+    public static function sql(string $value): array
+    {
+        return [
+            'kind' => 'text',
+            'value' => $value,
+            'style' => 'sql',
         ];
     }
 
@@ -347,13 +396,19 @@ final readonly class PanelView implements JsonSerializable
      * @param array<array-key, mixed> $rows Rows of inline or plain values in display order.
      * @param bool $collapsible Whether the host may collapse the table.
      * @param array<array-key, mixed> $styles Optional {@see ColumnStyle} cases keyed by column index.
+     * @param bool $filterable Whether to request the host's in-place row filter for the table.
      *
-     * @throws InvalidArgumentException If a header, row width, cell, or column style is invalid.
+     * @throws InvalidArgumentException if a header, row width, cell, or column style is invalid.
      *
      * @return self New view with the table appended.
      */
-    public function table(array $headers, array $rows, bool $collapsible = false, array $styles = []): self
-    {
+    public function table(
+        array $headers,
+        array $rows,
+        bool $collapsible = false,
+        array $styles = [],
+        bool $filterable = false,
+    ): self {
         $columns = self::headers($headers);
 
         return $this->append(
@@ -363,9 +418,11 @@ final readonly class PanelView implements JsonSerializable
                 'rows' => self::rows($rows, count($columns)),
                 'styles' => self::styles($styles, count($columns)),
                 'collapsible' => $collapsible,
+                'filterable' => $filterable,
             ],
         );
     }
+
 
     /**
      * Creates plain inline text.
@@ -417,6 +474,43 @@ final readonly class PanelView implements JsonSerializable
     }
 
     /**
+     * Creates the captured source frames of a call site, which the host renders through its own frame renderer.
+     *
+     * Frames travel as captured data, never as markup, so the host keeps ownership of the source-link format.
+     *
+     * @param array<array-key, mixed> $frames Captured frames in call order, each an array of frame fields.
+     *
+     * @throws InvalidArgumentException if a frame is not an array of fields.
+     *
+     * @return TraceInline Inline trace accepted by every content method.
+     */
+    public static function trace(array $frames): array
+    {
+        $captured = [];
+
+        foreach ($frames as $frame) {
+            if (is_array($frame) === false) {
+                throw new InvalidArgumentException(
+                    Message::TRACE_FRAME_INVALID->getMessage(),
+                );
+            }
+
+            $fields = [];
+
+            foreach ($frame as $key => $value) {
+                $fields[(string) $key] = $value;
+            }
+
+            $captured[] = $fields;
+        }
+
+        return [
+            'kind' => 'trace',
+            'frames' => $captured,
+        ];
+    }
+
+    /**
      * Creates a captured diagnostic value the host formats and escapes.
      *
      * @param mixed $value Diagnostic value, preserved without conversion.
@@ -455,7 +549,7 @@ final readonly class PanelView implements JsonSerializable
      *
      * @param array<array-key, mixed> $headers Column headings to validate.
      *
-     * @throws InvalidArgumentException If a heading is not a string.
+     * @throws InvalidArgumentException if a heading is not a string.
      *
      * @return list<string> Validated column headings in display order.
      */
@@ -466,7 +560,7 @@ final readonly class PanelView implements JsonSerializable
         foreach ($headers as $header) {
             if (is_string($header) === false) {
                 throw new InvalidArgumentException(
-                    'Debug panel table headers must be plain strings.',
+                    Message::TABLE_HEADER_INVALID->getMessage(),
                 );
             }
 
@@ -481,7 +575,7 @@ final readonly class PanelView implements JsonSerializable
      *
      * @param mixed $value Inline value or plain value to normalize.
      *
-     * @throws InvalidArgumentException If the value is not an accepted inline input.
+     * @throws InvalidArgumentException if the value is not an accepted inline input.
      *
      * @return Inline Normalized inline value.
      */
@@ -503,7 +597,7 @@ final readonly class PanelView implements JsonSerializable
      *
      * @param array<array-key, mixed> $value Candidate inline value.
      *
-     * @throws InvalidArgumentException If the array was not produced by an inline factory.
+     * @throws InvalidArgumentException if the array was not produced by an inline factory.
      *
      * @return Inline Validated inline value.
      */
@@ -517,15 +611,37 @@ final readonly class PanelView implements JsonSerializable
             return ['kind' => 'badge', 'label' => $label, 'tone' => $tone];
         }
 
+        $href = $value['href'] ?? null;
+        $external = $value['external'] ?? null;
+
+        if ($kind === 'link' && is_string($label) && is_string($href) && is_bool($external)) {
+            return [
+                'kind' => 'link',
+                'label' => $label,
+                'href' => self::target($href),
+                'external' => $external,
+            ];
+        }
+
         $text = $value['value'] ?? null;
         $style = $value['style'] ?? null;
 
-        if ($kind === 'text' && is_string($text) && in_array($style, ['code', 'plain', 'preview', 'strong'], true)) {
+        if (
+            $kind === 'text'
+            && is_string($text)
+            && in_array($style, ['code', 'plain', 'preview', 'sql', 'strong'], true)
+        ) {
             return [
                 'kind' => 'text',
                 'value' => $text,
                 'style' => $style,
             ];
+        }
+
+        $frames = $value['frames'] ?? null;
+
+        if ($kind === 'trace' && is_array($frames)) {
+            return self::trace($frames);
         }
 
         $typeOnly = $value['typeOnly'] ?? null;
@@ -547,7 +663,7 @@ final readonly class PanelView implements JsonSerializable
      * @param array<array-key, mixed> $content Inline values or plain values in display order.
      * @param Tone|null $tone Callout tone, or `null` for an ordinary paragraph.
      *
-     * @throws InvalidArgumentException If an item is not an accepted inline value.
+     * @throws InvalidArgumentException if an item is not an accepted inline value.
      *
      * @return ParagraphBlock Validated paragraph block.
      */
@@ -571,7 +687,7 @@ final readonly class PanelView implements JsonSerializable
      *
      * @param mixed $paragraph Paragraph description.
      *
-     * @throws InvalidArgumentException If the description is neither an inline value nor a list of them.
+     * @throws InvalidArgumentException if the description is neither an inline value nor a list of them.
      *
      * @return ParagraphBlock Validated paragraph block.
      */
@@ -583,7 +699,7 @@ final readonly class PanelView implements JsonSerializable
 
         if (array_is_list($paragraph) === false) {
             throw new InvalidArgumentException(
-                'Debug panel paragraphs must be scalars, inline values, or lists of them.',
+                Message::PARAGRAPH_CONTENT_INVALID->getMessage(),
             );
         }
 
@@ -596,7 +712,7 @@ final readonly class PanelView implements JsonSerializable
      * @param array<array-key, mixed> $rows Rows to validate.
      * @param int $columns Number of declared columns.
      *
-     * @throws InvalidArgumentException If a row is not a list or its width differs from the headers.
+     * @throws InvalidArgumentException if a row is not a list or its width differs from the headers.
      *
      * @return list<list<Inline>> Validated rows in display order.
      */
@@ -607,7 +723,7 @@ final readonly class PanelView implements JsonSerializable
         foreach ($rows as $row) {
             if (is_array($row) === false || array_is_list($row) === false || count($row) !== $columns) {
                 throw new InvalidArgumentException(
-                    'Debug panel table rows must be lists whose width matches the headers.',
+                    Message::TABLE_ROW_WIDTH_INVALID->getMessage(),
                 );
             }
 
@@ -629,7 +745,7 @@ final readonly class PanelView implements JsonSerializable
      * @param array<array-key, mixed> $styles Column styles keyed by column index.
      * @param int $columns Number of declared columns.
      *
-     * @throws InvalidArgumentException If a key is not an existing column index or a value is not a style.
+     * @throws InvalidArgumentException if a key is not an existing column index or a value is not a style.
      *
      * @return array<int, ColumnStyle> Validated column styles.
      */
@@ -640,13 +756,13 @@ final readonly class PanelView implements JsonSerializable
         foreach ($styles as $column => $style) {
             if (is_int($column) === false || $column < 0 || $column >= $columns) {
                 throw new InvalidArgumentException(
-                    'Debug panel column styles must be keyed by an existing column index.',
+                    Message::COLUMN_STYLE_KEY_INVALID->getMessage(),
                 );
             }
 
             if ($style instanceof ColumnStyle === false) {
                 throw new InvalidArgumentException(
-                    'Debug panel column styles must be ' . ColumnStyle::class . ' cases.',
+                    Message::COLUMN_STYLE_INVALID->getMessage(ColumnStyle::class),
                 );
             }
 
@@ -654,6 +770,46 @@ final readonly class PanelView implements JsonSerializable
         }
 
         return $result;
+    }
+
+    /**
+     * Rejects a link target the host must not follow.
+     *
+     * Characters a browser strips while resolving a URL are rejected first, because they move the scheme: a tab, a line
+     * break, or a surrounding space turns `" javascript:alert(1)"` into an executable target after the check.
+     *
+     * @param string $href Candidate target.
+     *
+     * @throws InvalidArgumentException if the target carries characters a browser strips, cannot be parsed, or declares
+     * a scheme other than `http`, `https`, or `mailto`.
+     *
+     * @return string Unmodified target.
+     */
+    private static function target(string $href): string
+    {
+        if (strpbrk($href, "\t\n\r") !== false || trim($href, "\x00..\x20") !== $href) {
+            throw new InvalidArgumentException(
+                Message::LINK_TARGET_NORMALIZED->getMessage(),
+            );
+        }
+
+        $parts = parse_url($href);
+
+        if ($parts === false) {
+            throw new InvalidArgumentException(
+                Message::LINK_TARGET_UNPARSABLE->getMessage(),
+            );
+        }
+
+        $scheme = $parts['scheme'] ?? null;
+
+        if ($scheme !== null && in_array(strtolower($scheme), ['http', 'https', 'mailto'], true) === false) {
+            throw new InvalidArgumentException(
+                Message::LINK_TARGET_SCHEME_INVALID->getMessage($scheme),
+            );
+        }
+
+        return $href;
     }
 
     /**
@@ -666,8 +822,7 @@ final readonly class PanelView implements JsonSerializable
     private static function unsupportedInline(mixed $value): InvalidArgumentException
     {
         return new InvalidArgumentException(
-            'Debug panel inline content must be a scalar, null, or a PanelView inline value. Got '
-            . get_debug_type($value) . '.',
+            Message::INLINE_CONTENT_INVALID->getMessage(get_debug_type($value)),
         );
     }
 }

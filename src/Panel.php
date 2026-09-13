@@ -41,7 +41,7 @@ abstract class Panel
     /**
      * Returns the icon identifier declared by the extension.
      *
-     * @throws InvalidArgumentException If the icon identifier is empty.
+     * @throws InvalidArgumentException if the icon identifier is empty.
      *
      * @return string Host-interpreted icon identifier.
      */
@@ -53,7 +53,7 @@ abstract class Panel
     /**
      * Returns the stable panel identifier declared by the extension.
      *
-     * @throws InvalidArgumentException If the panel identifier is empty.
+     * @throws InvalidArgumentException if the panel identifier is empty.
      *
      * @return string Identifier used to associate the panel with captured data.
      */
@@ -65,7 +65,7 @@ abstract class Panel
     /**
      * Returns the navigation title declared by the extension.
      *
-     * @throws InvalidArgumentException If the panel title is empty.
+     * @throws InvalidArgumentException if the panel title is empty.
      *
      * @return string Human-readable panel title.
      */
@@ -80,7 +80,7 @@ abstract class Panel
      * @param string $value Metadata value to validate.
      * @param string $field Constant name included in the validation error.
      *
-     * @throws InvalidArgumentException If the metadata value is empty.
+     * @throws InvalidArgumentException if the metadata value is empty.
      *
      * @return string Unmodified metadata value.
      */
