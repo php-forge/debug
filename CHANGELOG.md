@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.1.3 Under development
 
+- feat(panel-view): add typed readouts, pills, manifests, facts, and sections with factory methods.
+
 ## 0.1.2 September 13, 2026
 
 - fix(security): reject link targets a browser would normalize, and move exception messages to the `Exception\Message` enum.

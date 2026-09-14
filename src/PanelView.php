@@ -8,9 +8,11 @@ use InvalidArgumentException;
 use JsonSerializable;
 use PHPForge\Debug\Exception\PanelViewMessage;
 
+use function array_key_exists;
 use function count;
 use function in_array;
 use function is_array;
+use function is_bool;
 use function is_float;
 use function is_int;
 use function is_string;
@@ -29,6 +31,8 @@ use function trim;
  * The host reads the result through {@see self::summaryMetrics()}, {@see self::toolbarMetrics()}, {@see self::blocks()},
  * and {@see self::isActive()}. Nothing outside this class can build or alter a shape.
  *
+ * Inline values.
+ *
  * @phpstan-type BadgeInline array{kind: 'badge', label: string, tone: Tone}
  * @phpstan-type LinkInline array{kind: 'link', label: string, href: string, external: bool}
  * @phpstan-type TextInline array{kind: 'text', value: string, style: 'code'|'plain'|'preview'|'sql'|'strong'}
@@ -37,10 +41,27 @@ use function trim;
  * @phpstan-type Inline BadgeInline|LinkInline|TextInline|TraceInline|ValueInline
  * @phpstan-type Pair array{label: string, value: Inline}
  * @phpstan-type TextPair array{label: string, value: TextInline}
+ *
+ * Entries of a composite block.
+ *
+ * @phpstan-type FactEntry array{kind: 'fact', label: string, value: string}
+ * @phpstan-type PackageEntry array{kind: 'package', name: string, version: string}
+ * @phpstan-type PillEntry array{kind: 'pill', label: string, state: string, enabled: bool}
+ * @phpstan-type ReadoutEntry array{kind: 'readout', label: string, value: string, caption: string}
+ *
+ * Content blocks.
+ *
+ * @phpstan-type DisclosureBlock array{kind: 'disclosure', title: string, content: string}
  * @phpstan-type EmptyStateBlock array{kind: 'emptyState', title: string, paragraphs: list<ParagraphBlock>}
+ * @phpstan-type FactsBlock array{kind: 'facts', facts: list<FactEntry>}
  * @phpstan-type GroupBlock array{kind: 'group', label: string, content: PanelView}
+ * @phpstan-type HeadingBlock array{kind: 'heading', title: string, section: bool}
+ * @phpstan-type ManifestBlock array{kind: 'manifest', label: string, packages: list<PackageEntry>}
  * @phpstan-type OverviewBlock array{kind: 'overview', fields: list<Pair>, compact: bool}
  * @phpstan-type ParagraphBlock array{kind: 'paragraph', content: list<Inline>, tone: Tone|null}
+ * @phpstan-type PillsBlock array{kind: 'pills', pills: list<PillEntry>}
+ * @phpstan-type ReadoutsBlock array{kind: 'readouts', readouts: list<ReadoutEntry>}
+ * @phpstan-type SectionBlock array{kind: 'section', mark: string, title: string, count: int|null, content: PanelView}
  * @phpstan-type TableBlock array{
  *   kind: 'table',
  *   headers: list<string>,
@@ -49,11 +70,8 @@ use function trim;
  *   collapsible: bool,
  *   filterable: bool
  * }
- * @phpstan-type Block array{
- *   kind: 'disclosure',
- *   title: string,
- *   content: string
- * }|array{kind: 'heading', title: string, section: bool}|EmptyStateBlock|GroupBlock|OverviewBlock|ParagraphBlock|TableBlock
+ * @phpstan-type Block DisclosureBlock|EmptyStateBlock|FactsBlock|GroupBlock|HeadingBlock|ManifestBlock|OverviewBlock
+ *   |ParagraphBlock|PillsBlock|ReadoutsBlock|SectionBlock|TableBlock
  */
 final readonly class PanelView implements JsonSerializable
 {
@@ -79,12 +97,7 @@ final readonly class PanelView implements JsonSerializable
      */
     public function active(bool $active): self
     {
-        return new self(
-            $this->summary,
-            $this->blocks,
-            $this->toolbar,
-            $active,
-        );
+        return new self($this->summary, $this->blocks, $this->toolbar, $active);
     }
 
     /**
@@ -152,12 +165,7 @@ final readonly class PanelView implements JsonSerializable
      */
     public static function create(): self
     {
-        return new self(
-            [],
-            [],
-            [],
-            true,
-        );
+        return new self([], [], [], true);
     }
 
     /**
@@ -193,6 +201,35 @@ final readonly class PanelView implements JsonSerializable
         }
 
         return $this->append(['kind' => 'emptyState', 'title' => $title, 'paragraphs' => $content]);
+    }
+
+    /**
+     * Creates one compact label and value pair of a fact strip.
+     *
+     * @param string $label Name of the fact; the host escapes it.
+     * @param string $value Recorded value; the host escapes it.
+     *
+     * @return FactEntry Fact entry accepted by {@see self::facts()}.
+     */
+    public static function fact(string $label, string $value): array
+    {
+        return [
+            'kind' => 'fact',
+            'label' => $label,
+            'value' => $value,
+        ];
+    }
+
+    /**
+     * Appends a compact strip of label and value pairs.
+     *
+     * @param FactEntry ...$facts Entries produced by {@see self::fact()}.
+     *
+     * @return self New view with the fact strip appended.
+     */
+    public function facts(array ...$facts): self
+    {
+        return $this->append(['kind' => 'facts', 'facts' => array_values($facts)]);
     }
 
     /**
@@ -271,6 +308,19 @@ final readonly class PanelView implements JsonSerializable
     }
 
     /**
+     * Appends a vendor-grouped package manifest.
+     *
+     * @param string $label Vendor prefix the packages share, shown as the group heading.
+     * @param PackageEntry ...$packages Entries produced by {@see self::package()}.
+     *
+     * @return self New view with the manifest appended.
+     */
+    public function manifest(string $label, array ...$packages): self
+    {
+        return $this->append(['kind' => 'manifest', 'label' => $label, 'packages' => array_values($packages)]);
+    }
+
+    /**
      * Appends labeled overview fields, using array keys as labels.
      *
      * Labels are unique because they are array keys; repeat a value under a different label instead.
@@ -294,6 +344,23 @@ final readonly class PanelView implements JsonSerializable
     }
 
     /**
+     * Creates one package entry of a manifest.
+     *
+     * @param string $name Package name; the host escapes it.
+     * @param string $version Resolved version; the host escapes it.
+     *
+     * @return PackageEntry Package entry accepted by {@see self::manifest()}.
+     */
+    public static function package(string $name, string $version): array
+    {
+        return [
+            'kind' => 'package',
+            'name' => $name,
+            'version' => $version,
+        ];
+    }
+
+    /**
      * Appends an ordinary paragraph, converting plain values to text.
      *
      * @param mixed ...$content Ordered factory-produced inline values, scalars, or `null`.
@@ -305,6 +372,37 @@ final readonly class PanelView implements JsonSerializable
     public function paragraph(mixed ...$content): self
     {
         return $this->append(self::paragraphBlock($content, null));
+    }
+
+    /**
+     * Creates one status pill.
+     *
+     * @param string $label Subject of the pill, such as an extension name; the host escapes it.
+     * @param string $state Short state text shown after the label, such as `on` or a version.
+     * @param bool $enabled Whether the subject is active, selecting the on or off presentation.
+     *
+     * @return PillEntry Pill entry accepted by {@see self::pills()}.
+     */
+    public static function pill(string $label, string $state, bool $enabled): array
+    {
+        return [
+            'kind' => 'pill',
+            'label' => $label,
+            'state' => $state,
+            'enabled' => $enabled,
+        ];
+    }
+
+    /**
+     * Appends a strip of status pills.
+     *
+     * @param PillEntry ...$pills Entries produced by {@see self::pill()}.
+     *
+     * @return self New view with the pill strip appended.
+     */
+    public function pills(array ...$pills): self
+    {
+        return $this->append(['kind' => 'pills', 'pills' => array_values($pills)]);
     }
 
     /**
@@ -321,6 +419,60 @@ final readonly class PanelView implements JsonSerializable
             'value' => $value,
             'style' => 'preview',
         ];
+    }
+
+    /**
+     * Creates one headline readout card.
+     *
+     * @param string $label Metric name shown above the value; the host escapes it.
+     * @param string $value Headline value; the host escapes it.
+     * @param string $caption Qualifier shown under the value, or `''` to omit it.
+     *
+     * @return ReadoutEntry Readout entry accepted by {@see self::readouts()}.
+     */
+    public static function readout(string $label, string $value, string $caption = ''): array
+    {
+        return [
+            'kind' => 'readout',
+            'label' => $label,
+            'value' => $value,
+            'caption' => $caption,
+        ];
+    }
+
+    /**
+     * Appends a row of headline readout cards.
+     *
+     * @param ReadoutEntry ...$readouts Entries produced by {@see self::readout()}.
+     *
+     * @return self New view with the readout row appended.
+     */
+    public function readouts(array ...$readouts): self
+    {
+        return $this->append(['kind' => 'readouts', 'readouts' => array_values($readouts)]);
+    }
+
+    /**
+     * Appends a titled section wrapping its own content.
+     *
+     * @param string $mark Short glyph shown before the title, such as `::` or `//`.
+     * @param string $title Section title announced as its accessible name.
+     * @param self $content Blocks the section wraps.
+     * @param int|null $count Optional tally shown at the end of the title, or `null` to omit it.
+     *
+     * @return self New view with the section appended.
+     */
+    public function section(string $mark, string $title, self $content, int|null $count = null): self
+    {
+        return $this->append(
+            [
+                'kind' => 'section',
+                'mark' => $mark,
+                'title' => $title,
+                'count' => $count,
+                'content' => $content,
+            ],
+        );
     }
 
     /**
@@ -371,12 +523,7 @@ final readonly class PanelView implements JsonSerializable
             'value' => $emphasized ? self::strong((string) $value) : self::text((string) $value),
         ];
 
-        return new self(
-            [...$this->summary, $metric],
-            $this->blocks,
-            $this->toolbar,
-            $this->active,
-        );
+        return new self([...$this->summary, $metric], $this->blocks, $this->toolbar, $this->active);
     }
 
     /**
@@ -455,12 +602,7 @@ final readonly class PanelView implements JsonSerializable
             'value' => self::text((string) $value),
         ];
 
-        return new self(
-            $this->summary,
-            $this->blocks,
-            [...$this->toolbar, $metric],
-            $this->active,
-        );
+        return new self($this->summary, $this->blocks, [...$this->toolbar, $metric], $this->active);
     }
 
     /**
@@ -536,12 +678,7 @@ final readonly class PanelView implements JsonSerializable
      */
     private function append(array $block): self
     {
-        return new self(
-            $this->summary,
-            [...$this->blocks, $block],
-            $this->toolbar,
-            $this->active,
-        );
+        return new self($this->summary, [...$this->blocks, $block], $this->toolbar, $this->active);
     }
 
     /**
