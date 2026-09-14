@@ -223,13 +223,23 @@ final readonly class PanelView implements JsonSerializable
     /**
      * Appends a compact strip of label and value pairs.
      *
-     * @param FactEntry ...$facts Entries produced by {@see self::fact()}.
+     * @param array<array-key, mixed> ...$facts Entries produced by {@see self::fact()}.
+     *
+     * @throws InvalidArgumentException if an argument was not built by {@see self::fact()}.
      *
      * @return self New view with the fact strip appended.
      */
     public function facts(array ...$facts): self
     {
-        return $this->append(['kind' => 'facts', 'facts' => array_values($facts)]);
+        $entries = [];
+
+        foreach ($facts as $fact) {
+            self::assertFactEntry($fact);
+
+            $entries[] = $fact;
+        }
+
+        return $this->append(['kind' => 'facts', 'facts' => $entries]);
     }
 
     /**
@@ -311,13 +321,23 @@ final readonly class PanelView implements JsonSerializable
      * Appends a vendor-grouped package manifest.
      *
      * @param string $label Vendor prefix the packages share, shown as the group heading.
-     * @param PackageEntry ...$packages Entries produced by {@see self::package()}.
+     * @param array<array-key, mixed> ...$packages Entries produced by {@see self::package()}.
+     *
+     * @throws InvalidArgumentException if an argument was not built by {@see self::package()}.
      *
      * @return self New view with the manifest appended.
      */
     public function manifest(string $label, array ...$packages): self
     {
-        return $this->append(['kind' => 'manifest', 'label' => $label, 'packages' => array_values($packages)]);
+        $entries = [];
+
+        foreach ($packages as $package) {
+            self::assertPackageEntry($package);
+
+            $entries[] = $package;
+        }
+
+        return $this->append(['kind' => 'manifest', 'label' => $label, 'packages' => $entries]);
     }
 
     /**
@@ -396,13 +416,23 @@ final readonly class PanelView implements JsonSerializable
     /**
      * Appends a strip of status pills.
      *
-     * @param PillEntry ...$pills Entries produced by {@see self::pill()}.
+     * @param array<array-key, mixed> ...$pills Entries produced by {@see self::pill()}.
+     *
+     * @throws InvalidArgumentException if an argument was not built by {@see self::pill()}.
      *
      * @return self New view with the pill strip appended.
      */
     public function pills(array ...$pills): self
     {
-        return $this->append(['kind' => 'pills', 'pills' => array_values($pills)]);
+        $entries = [];
+
+        foreach ($pills as $pill) {
+            self::assertPillEntry($pill);
+
+            $entries[] = $pill;
+        }
+
+        return $this->append(['kind' => 'pills', 'pills' => $entries]);
     }
 
     /**
@@ -443,13 +473,23 @@ final readonly class PanelView implements JsonSerializable
     /**
      * Appends a row of headline readout cards.
      *
-     * @param ReadoutEntry ...$readouts Entries produced by {@see self::readout()}.
+     * @param array<array-key, mixed> ...$readouts Entries produced by {@see self::readout()}.
+     *
+     * @throws InvalidArgumentException if an argument was not built by {@see self::readout()}.
      *
      * @return self New view with the readout row appended.
      */
     public function readouts(array ...$readouts): self
     {
-        return $this->append(['kind' => 'readouts', 'readouts' => array_values($readouts)]);
+        $entries = [];
+
+        foreach ($readouts as $readout) {
+            self::assertReadoutEntry($readout);
+
+            $entries[] = $readout;
+        }
+
+        return $this->append(['kind' => 'readouts', 'readouts' => $entries]);
     }
 
     /**
@@ -679,6 +719,96 @@ final readonly class PanelView implements JsonSerializable
     private function append(array $block): self
     {
         return new self($this->summary, [...$this->blocks, $block], $this->toolbar, $this->active);
+    }
+
+    /**
+     * Asserts that an entry was built by {@see self::fact()}.
+     *
+     * @param array<array-key, mixed> $entry Entry passed to {@see self::facts()}.
+     *
+     * @throws InvalidArgumentException if the entry does not carry the shape the factory produces.
+     *
+     * @phpstan-assert FactEntry $entry
+     */
+    private static function assertFactEntry(array $entry): void
+    {
+        if (
+            ($entry['kind'] ?? null) !== 'fact'
+            || is_string($entry['label'] ?? null) === false
+            || is_string($entry['value'] ?? null) === false
+        ) {
+            throw new InvalidArgumentException(
+                PanelViewMessage::ENTRY_INVALID->getMessage('fact', 'fact'),
+            );
+        }
+    }
+
+    /**
+     * Asserts that an entry was built by {@see self::package()}.
+     *
+     * @param array<array-key, mixed> $entry Entry passed to {@see self::manifest()}.
+     *
+     * @throws InvalidArgumentException if the entry does not carry the shape the factory produces.
+     *
+     * @phpstan-assert PackageEntry $entry
+     */
+    private static function assertPackageEntry(array $entry): void
+    {
+        if (
+            ($entry['kind'] ?? null) !== 'package'
+            || is_string($entry['name'] ?? null) === false
+            || is_string($entry['version'] ?? null) === false
+        ) {
+            throw new InvalidArgumentException(
+                PanelViewMessage::ENTRY_INVALID->getMessage('package', 'package'),
+            );
+        }
+    }
+
+    /**
+     * Asserts that an entry was built by {@see self::pill()}.
+     *
+     * @param array<array-key, mixed> $entry Entry passed to {@see self::pills()}.
+     *
+     * @throws InvalidArgumentException if the entry does not carry the shape the factory produces.
+     *
+     * @phpstan-assert PillEntry $entry
+     */
+    private static function assertPillEntry(array $entry): void
+    {
+        if (
+            ($entry['kind'] ?? null) !== 'pill'
+            || is_string($entry['label'] ?? null) === false
+            || is_string($entry['state'] ?? null) === false
+            || is_bool($entry['enabled'] ?? null) === false
+        ) {
+            throw new InvalidArgumentException(
+                PanelViewMessage::ENTRY_INVALID->getMessage('pill', 'pill'),
+            );
+        }
+    }
+
+    /**
+     * Asserts that an entry was built by {@see self::readout()}.
+     *
+     * @param array<array-key, mixed> $entry Entry passed to {@see self::readouts()}.
+     *
+     * @throws InvalidArgumentException if the entry does not carry the shape the factory produces.
+     *
+     * @phpstan-assert ReadoutEntry $entry
+     */
+    private static function assertReadoutEntry(array $entry): void
+    {
+        if (
+            ($entry['kind'] ?? null) !== 'readout'
+            || is_string($entry['label'] ?? null) === false
+            || is_string($entry['value'] ?? null) === false
+            || is_string($entry['caption'] ?? null) === false
+        ) {
+            throw new InvalidArgumentException(
+                PanelViewMessage::ENTRY_INVALID->getMessage('readout', 'readout'),
+            );
+        }
     }
 
     /**

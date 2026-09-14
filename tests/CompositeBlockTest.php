@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace PHPForge\Debug\Tests;
 
+use Closure;
+use InvalidArgumentException;
+use PHPForge\Debug\Exception\PanelViewMessage;
 use PHPForge\Debug\PanelView;
-use PHPUnit\Framework\Attributes\Group;
+use PHPForge\Debug\Tests\Provider\MalformedEntryProvider;
+use PHPUnit\Framework\Attributes\{DataProviderExternal, Group};
 use PHPUnit\Framework\TestCase;
 
 /**
  * Unit tests for the {@see PanelView} composite blocks describing facts, readouts, pills, manifests, and sections.
+ *
+ * {@see MalformedEntryProvider} for test case data providers.
  */
 #[Group('panel-view')]
 final class CompositeBlockTest extends TestCase
@@ -112,5 +118,18 @@ final class CompositeBlockTest extends TestCase
             'A section keeps the tally it was given.',
         );
     }
+    /**
+     * @param Closure(): PanelView $build Composition that must reject the malformed entry.
+     * @param string $kind Entry kind the rejected argument was meant to carry.
+     */
+    #[DataProviderExternal(MalformedEntryProvider::class, 'entries')]
+    public function testThrowInvalidArgumentExceptionForAnEntryTheFactoryDidNotBuild(Closure $build, string $kind): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            PanelViewMessage::ENTRY_INVALID->getMessage($kind, $kind),
+        );
 
+        $build();
+    }
 }
