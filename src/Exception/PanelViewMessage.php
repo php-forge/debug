@@ -28,6 +28,13 @@ enum PanelViewMessage: string
     case COLUMN_STYLE_KEY_INVALID = 'Debug panel column styles must be keyed by an existing column index.';
 
     /**
+     * Indicates that an entry passed to a composite block was not built by the matching factory.
+     *
+     * Format: "Debug panel %s entries must be built with PanelView::%s()."
+     */
+    case ENTRY_INVALID = 'Debug panel %s entries must be built with PanelView::%s().';
+
+    /**
      * Indicates that an inline value is neither a scalar, `null`, nor a shape this class produces.
      *
      * Format: "Debug panel inline content must be a scalar, null, or a PanelView inline value. Got %s."
