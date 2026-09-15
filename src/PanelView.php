@@ -5,21 +5,14 @@ declare(strict_types=1);
 namespace PHPForge\Debug;
 
 use InvalidArgumentException;
-use JsonSerializable;
 use PHPForge\Debug\Exception\PanelViewMessage;
 
-use function array_key_exists;
-use function count;
-use function in_array;
+use function array_is_list;
+use function array_values;
 use function is_array;
-use function is_bool;
 use function is_float;
 use function is_int;
 use function is_string;
-use function parse_url;
-use function strpbrk;
-use function strtolower;
-use function trim;
 
 /**
  * Builds immutable panel descriptions without exposing the host's markup or styles.
@@ -28,57 +21,16 @@ use function trim;
  * scalars become text, with literal text for `null`, `true`, and `false`. Styled text, badges, and structured values
  * come from the static factories and are accepted wherever a scalar is accepted.
  *
- * The host reads the result through {@see self::summaryMetrics()}, {@see self::toolbarMetrics()}, {@see self::blocks()},
- * and {@see self::isActive()}. Nothing outside this class can build or alter a shape.
- *
- * Inline values.
- *
- * @phpstan-type BadgeInline array{kind: 'badge', label: string, tone: Tone}
- * @phpstan-type LinkInline array{kind: 'link', label: string, href: string, external: bool}
- * @phpstan-type TextInline array{kind: 'text', value: string, style: 'code'|'plain'|'preview'|'sql'|'strong'}
- * @phpstan-type TraceInline array{kind: 'trace', frames: list<array<string, mixed>>}
- * @phpstan-type ValueInline array{kind: 'value', value: mixed, typeOnly: bool}
- * @phpstan-type Inline BadgeInline|LinkInline|TextInline|TraceInline|ValueInline
- * @phpstan-type Pair array{label: string, value: Inline}
- * @phpstan-type TextPair array{label: string, value: TextInline}
- *
- * Entries of a composite block.
- *
- * @phpstan-type FactEntry array{kind: 'fact', label: string, value: string}
- * @phpstan-type PackageEntry array{kind: 'package', name: string, version: string}
- * @phpstan-type PillEntry array{kind: 'pill', label: string, state: string, enabled: bool}
- * @phpstan-type ReadoutEntry array{kind: 'readout', label: string, value: string, caption: string}
- *
- * Content blocks.
- *
- * @phpstan-type DisclosureBlock array{kind: 'disclosure', title: string, content: string}
- * @phpstan-type EmptyStateBlock array{kind: 'emptyState', title: string, paragraphs: list<ParagraphBlock>}
- * @phpstan-type FactsBlock array{kind: 'facts', facts: list<FactEntry>}
- * @phpstan-type GroupBlock array{kind: 'group', label: string, content: PanelView}
- * @phpstan-type HeadingBlock array{kind: 'heading', title: string, section: bool}
- * @phpstan-type ManifestBlock array{kind: 'manifest', label: string, packages: list<PackageEntry>}
- * @phpstan-type OverviewBlock array{kind: 'overview', fields: list<Pair>, compact: bool}
- * @phpstan-type ParagraphBlock array{kind: 'paragraph', content: list<Inline>, tone: Tone|null}
- * @phpstan-type PillsBlock array{kind: 'pills', pills: list<PillEntry>}
- * @phpstan-type ReadoutsBlock array{kind: 'readouts', readouts: list<ReadoutEntry>}
- * @phpstan-type SectionBlock array{kind: 'section', mark: string, title: string, count: int|null, content: PanelView}
- * @phpstan-type TableBlock array{
- *   kind: 'table',
- *   headers: list<string>,
- *   rows: list<list<Inline>>,
- *   styles: array<int, ColumnStyle>,
- *   collapsible: bool,
- *   filterable: bool
- * }
- * @phpstan-type Block DisclosureBlock|EmptyStateBlock|FactsBlock|GroupBlock|HeadingBlock|ManifestBlock|OverviewBlock
- *   |ParagraphBlock|PillsBlock|ReadoutsBlock|SectionBlock|TableBlock
+ * The finished description is a tree of `PHPForge\Debug\Presenter` value objects. The host reads it through
+ * {@see self::summaryMetrics()}, {@see self::toolbarMetrics()}, {@see self::blocks()}, and {@see self::isActive()},
+ * then narrows each value with `instanceof` over the sealed {@see Block} and {@see Inline} unions.
  */
-final readonly class PanelView implements JsonSerializable
+final readonly class PanelView
 {
     /**
-     * @param list<Pair> $summary Summary metrics in display order.
-     * @param list<Block> $blocks Panel content blocks in display order.
-     * @param list<TextPair> $toolbar Toolbar metrics in display order, separate from the summary.
+     * @param list<Presenter\SummaryMetric> $summary Summary metrics in display order.
+     * @param list<Presenter\Block> $blocks Panel content blocks in display order.
+     * @param list<Presenter\ToolbarMetric> $toolbar Toolbar metrics in display order, separate from the summary.
      * @param bool $active Whether the panel is marked active for host navigation.
      */
     private function __construct(
@@ -106,21 +58,17 @@ final readonly class PanelView implements JsonSerializable
      * @param string $label Badge text; the host escapes it.
      * @param Tone $tone Semantic tone interpreted by the host frontend.
      *
-     * @return BadgeInline Inline badge accepted by every content method.
+     * @return Presenter\BadgeInline Inline badge accepted by every content method.
      */
-    public static function badge(string $label, Tone $tone = Tone::MUTED): array
+    public static function badge(string $label, Tone $tone = Tone::MUTED): Presenter\BadgeInline
     {
-        return [
-            'kind' => 'badge',
-            'label' => $label,
-            'tone' => $tone,
-        ];
+        return new Presenter\BadgeInline($label, $tone);
     }
 
     /**
      * Returns the content blocks for the host renderer.
      *
-     * @return list<Block> Validated content blocks in display order.
+     * @return list<Presenter\Block> Validated content blocks in display order.
      */
     public function blocks(): array
     {
@@ -143,19 +91,68 @@ final readonly class PanelView implements JsonSerializable
     }
 
     /**
+     * Appends a card describing one entity, optionally split into titled columns of its own content.
+     *
+     * @param string $id Anchor the host emits so other blocks can link to the card, or `''` to omit it.
+     * @param string $icon Host icon key shown before the title, or `''` to omit it.
+     * @param string $title Entity name shown as the card heading; the host escapes it.
+     * @param string $subtitle Qualifier shown under the title, or `''` to omit it.
+     * @param array<array-key, mixed> $meta Inline values or scalars shown beside the title, such as counts.
+     * @param Presenter\ColumnEntry ...$columns Entries produced by {@see self::column()}.
+     *
+     * @throws InvalidArgumentException if a meta value is not an accepted inline value.
+     *
+     * @return self New view with the card appended.
+     */
+    public function card(
+        string $id,
+        string $icon,
+        string $title,
+        string $subtitle,
+        array $meta,
+        Presenter\ColumnEntry ...$columns
+    ): self {
+        $inline = [];
+
+        foreach ($meta as $value) {
+            $inline[] = self::inline($value);
+        }
+
+        return $this->append(
+            new Presenter\CardBlock(
+                $id,
+                $icon,
+                $title,
+                $subtitle,
+                $inline,
+                array_values($columns),
+            ),
+        );
+    }
+
+    /**
      * Creates inline text presented as source code.
      *
      * @param string $value Text content; the host escapes it.
      *
-     * @return TextInline Inline text accepted by every content method.
+     * @return Presenter\TextInline Inline text accepted by every content method.
      */
-    public static function code(string $value): array
+    public static function code(string $value): Presenter\TextInline
     {
-        return [
-            'kind' => 'text',
-            'value' => $value,
-            'style' => 'code',
-        ];
+        return new Presenter\TextInline($value, Presenter\TextStyle::CODE);
+    }
+
+    /**
+     * Creates one titled column of a card body.
+     *
+     * @param string $title Column heading announced as its accessible name.
+     * @param self $content Child view contributing only its ordered content blocks.
+     *
+     * @return Presenter\ColumnEntry Column entry accepted by {@see self::card()}.
+     */
+    public static function column(string $title, self $content): Presenter\ColumnEntry
+    {
+        return new Presenter\ColumnEntry($title, $content);
     }
 
     /**
@@ -178,7 +175,7 @@ final readonly class PanelView implements JsonSerializable
      */
     public function disclosure(string $title, string $content): self
     {
-        return $this->append(['kind' => 'disclosure', 'title' => $title, 'content' => $content]);
+        return $this->append(new Presenter\DisclosureBlock($title, $content));
     }
 
     /**
@@ -200,7 +197,7 @@ final readonly class PanelView implements JsonSerializable
             $content[] = self::paragraphOf($paragraph);
         }
 
-        return $this->append(['kind' => 'emptyState', 'title' => $title, 'paragraphs' => $content]);
+        return $this->append(new Presenter\EmptyStateBlock($title, $content));
     }
 
     /**
@@ -209,37 +206,49 @@ final readonly class PanelView implements JsonSerializable
      * @param string $label Name of the fact; the host escapes it.
      * @param string $value Recorded value; the host escapes it.
      *
-     * @return FactEntry Fact entry accepted by {@see self::facts()}.
+     * @return Presenter\FactEntry Fact entry accepted by {@see self::facts()}.
      */
-    public static function fact(string $label, string $value): array
+    public static function fact(string $label, string $value): Presenter\FactEntry
     {
-        return [
-            'kind' => 'fact',
-            'label' => $label,
-            'value' => $value,
-        ];
+        return new Presenter\FactEntry($label, $value);
     }
 
     /**
      * Appends a compact strip of label and value pairs.
      *
-     * @param array<array-key, mixed> ...$facts Entries produced by {@see self::fact()}.
-     *
-     * @throws InvalidArgumentException if an argument was not built by {@see self::fact()}.
+     * @param Presenter\FactEntry ...$facts Entries produced by {@see self::fact()}.
      *
      * @return self New view with the fact strip appended.
      */
-    public function facts(array ...$facts): self
+    public function facts(Presenter\FactEntry ...$facts): self
     {
-        $entries = [];
+        return $this->append(new Presenter\FactsBlock(array_values($facts)));
+    }
 
-        foreach ($facts as $fact) {
-            self::assertFactEntry($fact);
+    /**
+     * Creates one typed file entry of a file list.
+     *
+     * @param string $type Short kind label shown as a pill, such as `.css`; the host escapes it.
+     * @param string $name File name or URL; the host escapes it.
+     * @param Tone $tone Semantic tone interpreted by the host frontend.
+     *
+     * @return Presenter\FileEntry File entry accepted by {@see self::files()}.
+     */
+    public static function file(string $type, string $name, Tone $tone = Tone::MUTED): Presenter\FileEntry
+    {
+        return new Presenter\FileEntry($type, $name, $tone);
+    }
 
-            $entries[] = $fact;
-        }
-
-        return $this->append(['kind' => 'facts', 'facts' => $entries]);
+    /**
+     * Appends a list of typed file names.
+     *
+     * @param Presenter\FileEntry ...$files Entries produced by {@see self::file()}.
+     *
+     * @return self New view with the file list appended.
+     */
+    public function files(Presenter\FileEntry ...$files): self
+    {
+        return $this->append(new Presenter\FilesBlock(array_values($files)));
     }
 
     /**
@@ -252,7 +261,7 @@ final readonly class PanelView implements JsonSerializable
      */
     public function group(string $label, self $content): self
     {
-        return $this->append(['kind' => 'group', 'label' => $label, 'content' => $content]);
+        return $this->append(new Presenter\GroupBlock($label, $content));
     }
 
     /**
@@ -265,7 +274,7 @@ final readonly class PanelView implements JsonSerializable
      */
     public function heading(string $title, bool $section = false): self
     {
-        return $this->append(['kind' => 'heading', 'title' => $title, 'section' => $section]);
+        return $this->append(new Presenter\HeadingBlock($title, $section));
     }
 
     /**
@@ -276,21 +285,6 @@ final readonly class PanelView implements JsonSerializable
     public function isActive(): bool
     {
         return $this->active;
-    }
-
-    /**
-     * Returns the complete description for inspection, fixtures, and diffing.
-     *
-     * @return array{summary: list<Pair>, blocks: list<Block>, toolbar: list<TextPair>, active: bool} Description.
-     */
-    public function jsonSerialize(): array
-    {
-        return [
-            'summary' => $this->summary,
-            'blocks' => $this->blocks,
-            'toolbar' => $this->toolbar,
-            'active' => $this->active,
-        ];
     }
 
     /**
@@ -305,39 +299,37 @@ final readonly class PanelView implements JsonSerializable
      *
      * @throws InvalidArgumentException if the target declares a scheme the host must not follow.
      *
-     * @return LinkInline Inline link accepted by every content method.
+     * @return Presenter\LinkInline Inline link accepted by every content method.
      */
-    public static function link(string $label, string $href, bool $external = false): array
+    public static function link(string $label, string $href, bool $external = false): Presenter\LinkInline
     {
-        return [
-            'kind' => 'link',
-            'label' => $label,
-            'href' => self::target($href),
-            'external' => $external,
-        ];
+        return new Presenter\LinkInline($label, $href, $external);
+    }
+
+    /**
+     * Appends a labeled strip of navigation links.
+     *
+     * @param string $label Text introducing the strip, such as `Depends on 2`; the host escapes it.
+     * @param Presenter\LinkInline ...$links Inline values produced by {@see self::link()}.
+     *
+     * @return self New view with the link strip appended.
+     */
+    public function links(string $label, Presenter\LinkInline ...$links): self
+    {
+        return $this->append(new Presenter\LinksBlock($label, array_values($links)));
     }
 
     /**
      * Appends a vendor-grouped package manifest.
      *
      * @param string $label Vendor prefix the packages share, shown as the group heading.
-     * @param array<array-key, mixed> ...$packages Entries produced by {@see self::package()}.
-     *
-     * @throws InvalidArgumentException if an argument was not built by {@see self::package()}.
+     * @param Presenter\PackageEntry ...$packages Entries produced by {@see self::package()}.
      *
      * @return self New view with the manifest appended.
      */
-    public function manifest(string $label, array ...$packages): self
+    public function manifest(string $label, Presenter\PackageEntry ...$packages): self
     {
-        $entries = [];
-
-        foreach ($packages as $package) {
-            self::assertPackageEntry($package);
-
-            $entries[] = $package;
-        }
-
-        return $this->append(['kind' => 'manifest', 'label' => $label, 'packages' => $entries]);
+        return $this->append(new Presenter\ManifestBlock($label, array_values($packages)));
     }
 
     /**
@@ -357,10 +349,10 @@ final readonly class PanelView implements JsonSerializable
         $fields = [];
 
         foreach ($values as $label => $value) {
-            $fields[] = ['label' => (string) $label, 'value' => self::inline($value)];
+            $fields[] = new Presenter\FieldEntry((string) $label, self::inline($value));
         }
 
-        return $this->append(['kind' => 'overview', 'fields' => $fields, 'compact' => $compact]);
+        return $this->append(new Presenter\OverviewBlock($fields, $compact));
     }
 
     /**
@@ -369,15 +361,11 @@ final readonly class PanelView implements JsonSerializable
      * @param string $name Package name; the host escapes it.
      * @param string $version Resolved version; the host escapes it.
      *
-     * @return PackageEntry Package entry accepted by {@see self::manifest()}.
+     * @return Presenter\PackageEntry Package entry accepted by {@see self::manifest()}.
      */
-    public static function package(string $name, string $version): array
+    public static function package(string $name, string $version): Presenter\PackageEntry
     {
-        return [
-            'kind' => 'package',
-            'name' => $name,
-            'version' => $version,
-        ];
+        return new Presenter\PackageEntry($name, $version);
     }
 
     /**
@@ -401,38 +389,23 @@ final readonly class PanelView implements JsonSerializable
      * @param string $state Short state text shown after the label, such as `on` or a version.
      * @param bool $enabled Whether the subject is active, selecting the on or off presentation.
      *
-     * @return PillEntry Pill entry accepted by {@see self::pills()}.
+     * @return Presenter\PillEntry Pill entry accepted by {@see self::pills()}.
      */
-    public static function pill(string $label, string $state, bool $enabled): array
+    public static function pill(string $label, string $state, bool $enabled): Presenter\PillEntry
     {
-        return [
-            'kind' => 'pill',
-            'label' => $label,
-            'state' => $state,
-            'enabled' => $enabled,
-        ];
+        return new Presenter\PillEntry($label, $state, $enabled);
     }
 
     /**
      * Appends a strip of status pills.
      *
-     * @param array<array-key, mixed> ...$pills Entries produced by {@see self::pill()}.
-     *
-     * @throws InvalidArgumentException if an argument was not built by {@see self::pill()}.
+     * @param Presenter\PillEntry ...$pills Entries produced by {@see self::pill()}.
      *
      * @return self New view with the pill strip appended.
      */
-    public function pills(array ...$pills): self
+    public function pills(Presenter\PillEntry ...$pills): self
     {
-        $entries = [];
-
-        foreach ($pills as $pill) {
-            self::assertPillEntry($pill);
-
-            $entries[] = $pill;
-        }
-
-        return $this->append(['kind' => 'pills', 'pills' => $entries]);
+        return $this->append(new Presenter\PillsBlock(array_values($pills)));
     }
 
     /**
@@ -440,15 +413,11 @@ final readonly class PanelView implements JsonSerializable
      *
      * @param string $value Text content; the host escapes it.
      *
-     * @return TextInline Inline text accepted by every content method.
+     * @return Presenter\TextInline Inline text accepted by every content method.
      */
-    public static function preview(string $value): array
+    public static function preview(string $value): Presenter\TextInline
     {
-        return [
-            'kind' => 'text',
-            'value' => $value,
-            'style' => 'preview',
-        ];
+        return new Presenter\TextInline($value, Presenter\TextStyle::PREVIEW);
     }
 
     /**
@@ -458,38 +427,23 @@ final readonly class PanelView implements JsonSerializable
      * @param string $value Headline value; the host escapes it.
      * @param string $caption Qualifier shown under the value, or `''` to omit it.
      *
-     * @return ReadoutEntry Readout entry accepted by {@see self::readouts()}.
+     * @return Presenter\ReadoutEntry Readout entry accepted by {@see self::readouts()}.
      */
-    public static function readout(string $label, string $value, string $caption = ''): array
+    public static function readout(string $label, string $value, string $caption = ''): Presenter\ReadoutEntry
     {
-        return [
-            'kind' => 'readout',
-            'label' => $label,
-            'value' => $value,
-            'caption' => $caption,
-        ];
+        return new Presenter\ReadoutEntry($label, $value, $caption);
     }
 
     /**
      * Appends a row of headline readout cards.
      *
-     * @param array<array-key, mixed> ...$readouts Entries produced by {@see self::readout()}.
-     *
-     * @throws InvalidArgumentException if an argument was not built by {@see self::readout()}.
+     * @param Presenter\ReadoutEntry ...$readouts Entries produced by {@see self::readout()}.
      *
      * @return self New view with the readout row appended.
      */
-    public function readouts(array ...$readouts): self
+    public function readouts(Presenter\ReadoutEntry ...$readouts): self
     {
-        $entries = [];
-
-        foreach ($readouts as $readout) {
-            self::assertReadoutEntry($readout);
-
-            $entries[] = $readout;
-        }
-
-        return $this->append(['kind' => 'readouts', 'readouts' => $entries]);
+        return $this->append(new Presenter\ReadoutsBlock(array_values($readouts)));
     }
 
     /**
@@ -504,15 +458,7 @@ final readonly class PanelView implements JsonSerializable
      */
     public function section(string $mark, string $title, self $content, int|null $count = null): self
     {
-        return $this->append(
-            [
-                'kind' => 'section',
-                'mark' => $mark,
-                'title' => $title,
-                'count' => $count,
-                'content' => $content,
-            ],
-        );
+        return $this->append(new Presenter\SectionBlock($mark, $title, $count, $content));
     }
 
     /**
@@ -520,15 +466,38 @@ final readonly class PanelView implements JsonSerializable
      *
      * @param string $value Statement text; the host escapes it.
      *
-     * @return TextInline Inline text accepted by every content method.
+     * @return Presenter\TextInline Inline text accepted by every content method.
      */
-    public static function sql(string $value): array
+    public static function sql(string $value): Presenter\TextInline
     {
-        return [
-            'kind' => 'text',
-            'value' => $value,
-            'style' => 'sql',
-        ];
+        return new Presenter\TextInline($value, Presenter\TextStyle::SQL);
+    }
+
+    /**
+     * Creates one headline stat tile.
+     *
+     * @param string $icon Host icon key shown above the value.
+     * @param string $label Metric name shown under the value; the host escapes it.
+     * @param string $value Headline value; the host escapes it.
+     * @param Tone $tone Semantic tone interpreted by the host frontend, or {@see Tone::MUTED} to keep its own accent.
+     *
+     * @return Presenter\StatEntry Stat entry accepted by {@see self::stats()}.
+     */
+    public static function stat(string $icon, string $label, string $value, Tone $tone = Tone::MUTED): Presenter\StatEntry
+    {
+        return new Presenter\StatEntry($icon, $label, $value, $tone);
+    }
+
+    /**
+     * Appends a strip of headline stat tiles.
+     *
+     * @param Presenter\StatEntry ...$stats Entries produced by {@see self::stat()}.
+     *
+     * @return self New view with the stat strip appended.
+     */
+    public function stats(Presenter\StatEntry ...$stats): self
+    {
+        return $this->append(new Presenter\StatsBlock(array_values($stats)));
     }
 
     /**
@@ -536,15 +505,11 @@ final readonly class PanelView implements JsonSerializable
      *
      * @param string $value Text content; the host escapes it.
      *
-     * @return TextInline Inline text accepted by every content method.
+     * @return Presenter\TextInline Inline text accepted by every content method.
      */
-    public static function strong(string $value): array
+    public static function strong(string $value): Presenter\TextInline
     {
-        return [
-            'kind' => 'text',
-            'value' => $value,
-            'style' => 'strong',
-        ];
+        return new Presenter\TextInline($value, Presenter\TextStyle::STRONG);
     }
 
     /**
@@ -558,10 +523,10 @@ final readonly class PanelView implements JsonSerializable
      */
     public function summary(string $label, string|int|float $value, bool $emphasized = true): self
     {
-        $metric = [
-            'label' => $label,
-            'value' => $emphasized ? self::strong((string) $value) : self::text((string) $value),
-        ];
+        $metric = new Presenter\SummaryMetric(
+            $label,
+            $emphasized ? self::strong((string) $value) : self::text((string) $value),
+        );
 
         return new self([...$this->summary, $metric], $this->blocks, $this->toolbar, $this->active);
     }
@@ -569,7 +534,7 @@ final readonly class PanelView implements JsonSerializable
     /**
      * Returns the summary metrics for the host renderer.
      *
-     * @return list<Pair> Validated summary metrics in display order.
+     * @return list<Presenter\SummaryMetric> Validated summary metrics in display order.
      */
     public function summaryMetrics(): array
     {
@@ -596,35 +561,27 @@ final readonly class PanelView implements JsonSerializable
         array $styles = [],
         bool $filterable = false,
     ): self {
-        $columns = self::headers($headers);
-
         return $this->append(
-            [
-                'kind' => 'table',
-                'headers' => $columns,
-                'rows' => self::rows($rows, count($columns)),
-                'styles' => self::styles($styles, count($columns)),
-                'collapsible' => $collapsible,
-                'filterable' => $filterable,
-            ],
+            new Presenter\TableBlock(
+                $headers,
+                self::cells($rows),
+                $styles,
+                $collapsible,
+                $filterable,
+            ),
         );
     }
-
 
     /**
      * Creates plain inline text.
      *
      * @param string $value Text content; the host escapes it.
      *
-     * @return TextInline Inline text accepted by every content method.
+     * @return Presenter\TextInline Inline text accepted by every content method.
      */
-    public static function text(string $value): array
+    public static function text(string $value): Presenter\TextInline
     {
-        return [
-            'kind' => 'text',
-            'value' => $value,
-            'style' => 'plain',
-        ];
+        return new Presenter\TextInline($value, Presenter\TextStyle::PLAIN);
     }
 
     /**
@@ -637,10 +594,7 @@ final readonly class PanelView implements JsonSerializable
      */
     public function toolbar(string $label, string|int|float $value): self
     {
-        $metric = [
-            'label' => $label,
-            'value' => self::text((string) $value),
-        ];
+        $metric = new Presenter\ToolbarMetric($label, (string) $value);
 
         return new self($this->summary, $this->blocks, [...$this->toolbar, $metric], $this->active);
     }
@@ -648,7 +602,7 @@ final readonly class PanelView implements JsonSerializable
     /**
      * Returns the toolbar metrics for the host renderer.
      *
-     * @return list<TextPair> Validated toolbar metrics in display order.
+     * @return list<Presenter\ToolbarMetric> Validated toolbar metrics in display order.
      */
     public function toolbarMetrics(): array
     {
@@ -664,32 +618,11 @@ final readonly class PanelView implements JsonSerializable
      *
      * @throws InvalidArgumentException if a frame is not an array of fields.
      *
-     * @return TraceInline Inline trace accepted by every content method.
+     * @return Presenter\TraceInline Inline trace accepted by every content method.
      */
-    public static function trace(array $frames): array
+    public static function trace(array $frames): Presenter\TraceInline
     {
-        $captured = [];
-
-        foreach ($frames as $frame) {
-            if (is_array($frame) === false) {
-                throw new InvalidArgumentException(
-                    PanelViewMessage::TRACE_FRAME_INVALID->getMessage(),
-                );
-            }
-
-            $fields = [];
-
-            foreach ($frame as $key => $value) {
-                $fields[(string) $key] = $value;
-            }
-
-            $captured[] = $fields;
-        }
-
-        return [
-            'kind' => 'trace',
-            'frames' => $captured,
-        ];
+        return new Presenter\TraceInline($frames);
     }
 
     /**
@@ -698,297 +631,40 @@ final readonly class PanelView implements JsonSerializable
      * @param mixed $value Diagnostic value, preserved without conversion.
      * @param bool $typeOnly Whether to show only the value's type instead of its contents.
      *
-     * @return ValueInline Inline value accepted by every content method.
+     * @return Presenter\ValueInline Inline value accepted by every content method.
      */
-    public static function value(mixed $value, bool $typeOnly = false): array
+    public static function value(mixed $value, bool $typeOnly = false): Presenter\ValueInline
     {
-        return [
-            'kind' => 'value',
-            'value' => $value,
-            'typeOnly' => $typeOnly,
-        ];
+        return new Presenter\ValueInline($value, $typeOnly);
     }
 
     /**
      * Appends a content block while retaining metrics and activity.
      *
-     * @param Block $block Content block placed after the existing blocks.
+     * @param Presenter\Block $block Content block placed after the existing blocks.
      *
      * @return self New view containing the additional block.
      */
-    private function append(array $block): self
+    private function append(Presenter\Block $block): self
     {
         return new self($this->summary, [...$this->blocks, $block], $this->toolbar, $this->active);
     }
 
     /**
-     * Asserts that an entry was built by {@see self::fact()}.
+     * Converts table rows to inline cells, rejecting rows that are not lists.
      *
-     * @param array<array-key, mixed> $entry Entry passed to {@see self::facts()}.
+     * @param array<array-key, mixed> $rows Rows to normalize.
      *
-     * @throws InvalidArgumentException if the entry does not carry the shape the factory produces.
+     * @throws InvalidArgumentException if a row is not a list or a cell is not an accepted inline value.
      *
-     * @phpstan-assert FactEntry $entry
+     * @return list<list<Presenter\Inline>> Normalized rows in display order.
      */
-    private static function assertFactEntry(array $entry): void
-    {
-        if (
-            ($entry['kind'] ?? null) !== 'fact'
-            || is_string($entry['label'] ?? null) === false
-            || is_string($entry['value'] ?? null) === false
-        ) {
-            throw new InvalidArgumentException(
-                PanelViewMessage::ENTRY_INVALID->getMessage('fact', 'fact'),
-            );
-        }
-    }
-
-    /**
-     * Asserts that an entry was built by {@see self::package()}.
-     *
-     * @param array<array-key, mixed> $entry Entry passed to {@see self::manifest()}.
-     *
-     * @throws InvalidArgumentException if the entry does not carry the shape the factory produces.
-     *
-     * @phpstan-assert PackageEntry $entry
-     */
-    private static function assertPackageEntry(array $entry): void
-    {
-        if (
-            ($entry['kind'] ?? null) !== 'package'
-            || is_string($entry['name'] ?? null) === false
-            || is_string($entry['version'] ?? null) === false
-        ) {
-            throw new InvalidArgumentException(
-                PanelViewMessage::ENTRY_INVALID->getMessage('package', 'package'),
-            );
-        }
-    }
-
-    /**
-     * Asserts that an entry was built by {@see self::pill()}.
-     *
-     * @param array<array-key, mixed> $entry Entry passed to {@see self::pills()}.
-     *
-     * @throws InvalidArgumentException if the entry does not carry the shape the factory produces.
-     *
-     * @phpstan-assert PillEntry $entry
-     */
-    private static function assertPillEntry(array $entry): void
-    {
-        if (
-            ($entry['kind'] ?? null) !== 'pill'
-            || is_string($entry['label'] ?? null) === false
-            || is_string($entry['state'] ?? null) === false
-            || is_bool($entry['enabled'] ?? null) === false
-        ) {
-            throw new InvalidArgumentException(
-                PanelViewMessage::ENTRY_INVALID->getMessage('pill', 'pill'),
-            );
-        }
-    }
-
-    /**
-     * Asserts that an entry was built by {@see self::readout()}.
-     *
-     * @param array<array-key, mixed> $entry Entry passed to {@see self::readouts()}.
-     *
-     * @throws InvalidArgumentException if the entry does not carry the shape the factory produces.
-     *
-     * @phpstan-assert ReadoutEntry $entry
-     */
-    private static function assertReadoutEntry(array $entry): void
-    {
-        if (
-            ($entry['kind'] ?? null) !== 'readout'
-            || is_string($entry['label'] ?? null) === false
-            || is_string($entry['value'] ?? null) === false
-            || is_string($entry['caption'] ?? null) === false
-        ) {
-            throw new InvalidArgumentException(
-                PanelViewMessage::ENTRY_INVALID->getMessage('readout', 'readout'),
-            );
-        }
-    }
-
-    /**
-     * Rejects column headings that are not plain strings.
-     *
-     * @param array<array-key, mixed> $headers Column headings to validate.
-     *
-     * @throws InvalidArgumentException if a heading is not a string.
-     *
-     * @return list<string> Validated column headings in display order.
-     */
-    private static function headers(array $headers): array
-    {
-        $columns = [];
-
-        foreach ($headers as $header) {
-            if (is_string($header) === false) {
-                throw new InvalidArgumentException(
-                    PanelViewMessage::TABLE_HEADER_INVALID->getMessage(),
-                );
-            }
-
-            $columns[] = $header;
-        }
-
-        return $columns;
-    }
-
-    /**
-     * Retains inline values and converts scalars and `null` to text.
-     *
-     * @param mixed $value Inline value or plain value to normalize.
-     *
-     * @throws InvalidArgumentException if the value is not an accepted inline input.
-     *
-     * @return Inline Normalized inline value.
-     */
-    private static function inline(mixed $value): array
-    {
-        return match (true) {
-            is_array($value) => self::inlineShape($value),
-            $value === null => self::text('null'),
-            $value === true => self::text('true'),
-            $value === false => self::text('false'),
-            is_string($value) => self::text($value),
-            is_int($value), is_float($value) => self::text((string) $value),
-            default => throw self::unsupportedInline($value),
-        };
-    }
-
-    /**
-     * Rebuilds a factory-produced inline value, rejecting every other array.
-     *
-     * @param array<array-key, mixed> $value Candidate inline value.
-     *
-     * @throws InvalidArgumentException if the array was not produced by an inline factory.
-     *
-     * @return Inline Validated inline value.
-     */
-    private static function inlineShape(array $value): array
-    {
-        $kind = $value['kind'] ?? null;
-        $label = $value['label'] ?? null;
-        $tone = $value['tone'] ?? null;
-
-        if ($kind === 'badge' && is_string($label) && $tone instanceof Tone) {
-            return ['kind' => 'badge', 'label' => $label, 'tone' => $tone];
-        }
-
-        $href = $value['href'] ?? null;
-        $external = $value['external'] ?? null;
-
-        if ($kind === 'link' && is_string($label) && is_string($href) && is_bool($external)) {
-            return [
-                'kind' => 'link',
-                'label' => $label,
-                'href' => self::target($href),
-                'external' => $external,
-            ];
-        }
-
-        $text = $value['value'] ?? null;
-        $style = $value['style'] ?? null;
-
-        if (
-            $kind === 'text'
-            && is_string($text)
-            && in_array($style, ['code', 'plain', 'preview', 'sql', 'strong'], true)
-        ) {
-            return [
-                'kind' => 'text',
-                'value' => $text,
-                'style' => $style,
-            ];
-        }
-
-        $frames = $value['frames'] ?? null;
-
-        if ($kind === 'trace' && is_array($frames)) {
-            return self::trace($frames);
-        }
-
-        $typeOnly = $value['typeOnly'] ?? null;
-
-        if ($kind === 'value' && array_key_exists('value', $value) && is_bool($typeOnly)) {
-            return [
-                'kind' => 'value',
-                'value' => $value['value'],
-                'typeOnly' => $typeOnly,
-            ];
-        }
-
-        throw self::unsupportedInline($value);
-    }
-
-    /**
-     * Builds a paragraph block from ordered inline inputs.
-     *
-     * @param array<array-key, mixed> $content Inline values or plain values in display order.
-     * @param Tone|null $tone Callout tone, or `null` for an ordinary paragraph.
-     *
-     * @throws InvalidArgumentException if an item is not an accepted inline value.
-     *
-     * @return ParagraphBlock Validated paragraph block.
-     */
-    private static function paragraphBlock(array $content, Tone|null $tone): array
-    {
-        $inline = [];
-
-        foreach ($content as $value) {
-            $inline[] = self::inline($value);
-        }
-
-        return [
-            'kind' => 'paragraph',
-            'content' => $inline,
-            'tone' => $tone,
-        ];
-    }
-
-    /**
-     * Builds one paragraph from a string, a single inline value, or a list of inline values.
-     *
-     * @param mixed $paragraph Paragraph description.
-     *
-     * @throws InvalidArgumentException if the description is neither an inline value nor a list of them.
-     *
-     * @return ParagraphBlock Validated paragraph block.
-     */
-    private static function paragraphOf(mixed $paragraph): array
-    {
-        if (is_array($paragraph) === false || array_key_exists('kind', $paragraph)) {
-            return self::paragraphBlock([$paragraph], null);
-        }
-
-        if (array_is_list($paragraph) === false) {
-            throw new InvalidArgumentException(
-                PanelViewMessage::PARAGRAPH_CONTENT_INVALID->getMessage(),
-            );
-        }
-
-        return self::paragraphBlock($paragraph, null);
-    }
-
-    /**
-     * Rejects rows that are not lists of the table's width.
-     *
-     * @param array<array-key, mixed> $rows Rows to validate.
-     * @param int $columns Number of declared columns.
-     *
-     * @throws InvalidArgumentException if a row is not a list or its width differs from the headers.
-     *
-     * @return list<list<Inline>> Validated rows in display order.
-     */
-    private static function rows(array $rows, int $columns): array
+    private static function cells(array $rows): array
     {
         $result = [];
 
         foreach ($rows as $row) {
-            if (is_array($row) === false || array_is_list($row) === false || count($row) !== $columns) {
+            if (is_array($row) === false || array_is_list($row) === false) {
                 throw new InvalidArgumentException(
                     PanelViewMessage::TABLE_ROW_WIDTH_INVALID->getMessage(),
                 );
@@ -1007,76 +683,70 @@ final readonly class PanelView implements JsonSerializable
     }
 
     /**
-     * Rejects column styles that do not address a declared column.
+     * Retains inline values and converts scalars and `null` to text.
      *
-     * @param array<array-key, mixed> $styles Column styles keyed by column index.
-     * @param int $columns Number of declared columns.
+     * @param mixed $value Inline value or plain value to normalize.
      *
-     * @throws InvalidArgumentException if a key is not an existing column index or a value is not a style.
+     * @throws InvalidArgumentException if the value is not an accepted inline input.
      *
-     * @return array<int, ColumnStyle> Validated column styles.
+     * @return Presenter\Inline Normalized inline value.
      */
-    private static function styles(array $styles, int $columns): array
+    private static function inline(mixed $value): Presenter\Inline
     {
-        $result = [];
-
-        foreach ($styles as $column => $style) {
-            if (is_int($column) === false || $column < 0 || $column >= $columns) {
-                throw new InvalidArgumentException(
-                    PanelViewMessage::COLUMN_STYLE_KEY_INVALID->getMessage(),
-                );
-            }
-
-            if ($style instanceof ColumnStyle === false) {
-                throw new InvalidArgumentException(
-                    PanelViewMessage::COLUMN_STYLE_INVALID->getMessage(ColumnStyle::class),
-                );
-            }
-
-            $result[$column] = $style;
-        }
-
-        return $result;
+        return match (true) {
+            $value instanceof Presenter\Inline => $value,
+            $value === null => self::text('null'),
+            $value === true => self::text('true'),
+            $value === false => self::text('false'),
+            is_string($value) => self::text($value),
+            is_int($value), is_float($value) => self::text((string) $value),
+            default => throw self::unsupportedInline($value),
+        };
     }
 
     /**
-     * Rejects a link target the host must not follow.
+     * Builds a paragraph block from ordered inline inputs.
      *
-     * Characters a browser strips while resolving a URL are rejected first, because they move the scheme: a tab, a line
-     * break, or a surrounding space turns `" javascript:alert(1)"` into an executable target after the check.
+     * @param array<array-key, mixed> $content Inline values or plain values in display order.
+     * @param Tone|null $tone Callout tone, or `null` for an ordinary paragraph.
      *
-     * @param string $href Candidate target.
+     * @throws InvalidArgumentException if an item is not an accepted inline value.
      *
-     * @throws InvalidArgumentException if the target carries characters a browser strips, cannot be parsed, or declares
-     * a scheme other than `http`, `https`, or `mailto`.
-     *
-     * @return string Unmodified target.
+     * @return Presenter\ParagraphBlock Normalized paragraph block.
      */
-    private static function target(string $href): string
+    private static function paragraphBlock(array $content, Tone|null $tone): Presenter\ParagraphBlock
     {
-        if (strpbrk($href, "\t\n\r") !== false || trim($href, "\x00..\x20") !== $href) {
+        $inline = [];
+
+        foreach ($content as $value) {
+            $inline[] = self::inline($value);
+        }
+
+        return new Presenter\ParagraphBlock($inline, $tone);
+    }
+
+    /**
+     * Builds one paragraph from a scalar, a single inline value, or a list of inline values.
+     *
+     * @param mixed $paragraph Paragraph description.
+     *
+     * @throws InvalidArgumentException if the description is neither an inline value nor a list of them.
+     *
+     * @return Presenter\ParagraphBlock Normalized paragraph block.
+     */
+    private static function paragraphOf(mixed $paragraph): Presenter\ParagraphBlock
+    {
+        if (is_array($paragraph) === false) {
+            return self::paragraphBlock([$paragraph], null);
+        }
+
+        if (array_is_list($paragraph) === false) {
             throw new InvalidArgumentException(
-                PanelViewMessage::LINK_TARGET_NORMALIZED->getMessage(),
+                PanelViewMessage::PARAGRAPH_CONTENT_INVALID->getMessage(),
             );
         }
 
-        $parts = parse_url($href);
-
-        if ($parts === false) {
-            throw new InvalidArgumentException(
-                PanelViewMessage::LINK_TARGET_UNPARSABLE->getMessage(),
-            );
-        }
-
-        $scheme = $parts['scheme'] ?? null;
-
-        if ($scheme !== null && in_array(strtolower($scheme), ['http', 'https', 'mailto'], true) === false) {
-            throw new InvalidArgumentException(
-                PanelViewMessage::LINK_TARGET_SCHEME_INVALID->getMessage($scheme),
-            );
-        }
-
-        return $href;
+        return self::paragraphBlock($paragraph, null);
     }
 
     /**

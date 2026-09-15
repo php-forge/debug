@@ -153,8 +153,9 @@ replays a stored capture with no debugger host present.
 
 ## Presentation vocabulary
 
-Five types are published: `CollectorInterface`, `Panel`, `PanelView`, `Tone`, and `ColumnStyle`. Everything a panel can
-display is a `PanelView` method, so there is no value class to import and no shape to build by hand.
+Five types are published for panel authors: `CollectorInterface`, `Panel`, `PanelView`, `Tone`, and `ColumnStyle`.
+Everything a panel can display is a `PanelView` method, so an extension imports no value class and builds nothing by
+hand.
 
 ```php
 use PHPForge\Debug\{ColumnStyle, PanelView, Tone};
@@ -174,9 +175,26 @@ PanelView::create()
 ```
 
 Plain scalars and `null` become text. `PanelView::text()`, `::strong()`, `::code()`, `::preview()`, `::badge()`, and
-`::value()` produce validated inline values accepted wherever a scalar is accepted. Every method validates its
-arguments and rejects invalid input with an explicit `InvalidArgumentException`. The host reads the finished
-description through `summaryMetrics()`, `toolbarMetrics()`, `blocks()`, and `isActive()`.
+`::value()` produce validated inline values accepted wherever a scalar is accepted. Methods with explicit value
+validation reject invalid input with an `InvalidArgumentException`; arguments with incompatible declared types raise
+PHP's native `TypeError`.
+
+The host reads the finished description through `summaryMetrics()`, `toolbarMetrics()`, `blocks()`, and `isActive()`.
+Those accessors return `PHPForge\Debug\Presenter` value objects: `SummaryMetric`, `ToolbarMetric`, and the blocks,
+entries, and inline values behind them. A renderer narrows each value with `instanceof` over the sealed `Block` and
+`Inline` unions, which static analysis proves exhaustive, and reads its public properties. Inline text carries a
+`TextStyle` case and a table carries its `ColumnStyle` cases, so semantics reach the markup without parsing strings.
+
+```php
+use PHPForge\Debug\Presenter\{HeadingBlock, ParagraphBlock, TableBlock};
+
+$html = match (true) {
+    $block instanceof HeadingBlock => $this->heading($block->title, $block->section),
+    $block instanceof ParagraphBlock => $this->paragraph($block->content, $block->tone),
+    $block instanceof TableBlock => $this->table($block->headers, $block->rows, $block->styles),
+    // one arm per block; PHPStan reports a missing arm as an unhandled match value.
+};
+```
 
 ## Documentation
 

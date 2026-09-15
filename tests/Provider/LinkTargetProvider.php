@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace PHPForge\Debug\Tests\Provider;
 
-use PHPForge\Debug\Tests\PanelViewTest;
+use PHPForge\Debug\Tests\Presenter\LinkInlineTest;
 
 /**
- * Provides link targets whose acceptance or rejection by {@see PanelViewTest} defines the safe-scheme contract.
+ * Provides link targets whose acceptance or rejection by {@see LinkInlineTest} defines the safe-scheme contract.
  */
 final class LinkTargetProvider
 {
@@ -20,6 +20,7 @@ final class LinkTargetProvider
         yield 'colon inside a fragment' => ['#a:b'];
         yield 'colon inside a query' => ['?at=a:b'];
         yield 'colon opening the target' => [':relative'];
+        yield 'fragment naming a card anchor' => ['#app-asset'];
         yield 'fragment' => ['#queries'];
         yield 'http' => ['http://example.test/'];
         yield 'https with uppercase scheme' => ['HTTPS://example.test/'];

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPForge\Debug\Tests\Provider;
 
+use PHPForge\Debug\Presenter\TextInline;
+use PHPForge\Debug\Presenter\TextStyle;
 use PHPForge\Debug\Tests\PanelViewTest;
 
 /**
@@ -12,15 +14,15 @@ use PHPForge\Debug\Tests\PanelViewTest;
 final class InlineScalarProvider
 {
     /**
-     * @return iterable<string, array{mixed, array{kind: 'text', value: string, style: 'plain'}}>
+     * @return iterable<string, array{mixed, TextInline}>
      */
     public static function plainText(): iterable
     {
-        yield 'false' => [false, ['kind' => 'text', 'value' => 'false', 'style' => 'plain']];
-        yield 'float' => [1.5, ['kind' => 'text', 'value' => '1.5', 'style' => 'plain']];
-        yield 'int' => [7, ['kind' => 'text', 'value' => '7', 'style' => 'plain']];
-        yield 'null' => [null, ['kind' => 'text', 'value' => 'null', 'style' => 'plain']];
-        yield 'string' => ['<raw>', ['kind' => 'text', 'value' => '<raw>', 'style' => 'plain']];
-        yield 'true' => [true, ['kind' => 'text', 'value' => 'true', 'style' => 'plain']];
+        yield 'false' => [false, new TextInline('false', TextStyle::PLAIN)];
+        yield 'float' => [1.5, new TextInline('1.5', TextStyle::PLAIN)];
+        yield 'int' => [7, new TextInline('7', TextStyle::PLAIN)];
+        yield 'null' => [null, new TextInline('null', TextStyle::PLAIN)];
+        yield 'string' => ['<raw>', new TextInline('<raw>', TextStyle::PLAIN)];
+        yield 'true' => [true, new TextInline('true', TextStyle::PLAIN)];
     }
 }

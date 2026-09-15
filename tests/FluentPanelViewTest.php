@@ -5,6 +5,16 @@ declare(strict_types=1);
 namespace PHPForge\Debug\Tests;
 
 use PHPForge\Debug\{ColumnStyle, PanelView, Tone};
+use PHPForge\Debug\Presenter\{
+    DisclosureBlock,
+    EmptyStateBlock,
+    FieldEntry,
+    GroupBlock,
+    HeadingBlock,
+    OverviewBlock,
+    ParagraphBlock,
+    TableBlock,
+};
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -19,7 +29,6 @@ final class FluentPanelViewTest extends TestCase
         $nested = PanelView::create()
             ->heading('Nested')
             ->paragraph('Nested text');
-
         $view = PanelView::create()
             ->summary(' hits', 3)
             ->toolbar('Hits', 3)
@@ -40,61 +49,41 @@ final class FluentPanelViewTest extends TestCase
             ->disclosure('Raw', '<data>')
             ->group('Nested group', $nested);
 
-        self::assertSame(
+        self::assertEquals(
             [
-                [
-                    'kind' => 'overview',
-                    'fields' => [
-                        ['label' => 'Driver', 'value' => PanelView::text('redis')],
-                        ['label' => 'State', 'value' => $badge],
-                        ['label' => 'Null', 'value' => PanelView::text('null')],
-                        ['label' => 'Ratio', 'value' => PanelView::text('1.5')],
+                new OverviewBlock(
+                    [
+                        new FieldEntry('Driver', PanelView::text('redis')),
+                        new FieldEntry('State', $badge),
+                        new FieldEntry('Null', PanelView::text('null')),
+                        new FieldEntry('Ratio', PanelView::text('1.5')),
                     ],
-                    'compact' => true,
-                ],
-                [
-                    'kind' => 'heading',
-                    'title' => 'Entries',
-                    'section' => true,
-                ],
-                [
-                    'kind' => 'table',
-                    'headers' => ['Key', 'Value'],
-                    'rows' => [
+                    true,
+                ),
+                new HeadingBlock('Entries', true),
+                new TableBlock(
+                    ['Key', 'Value'],
+                    [
                         [PanelView::text('home'), PanelView::text('true')],
                         [$badge, PanelView::value(1)],
                     ],
-                    'styles' => [0 => ColumnStyle::MONOSPACE],
-                    'collapsible' => true,
-                    'filterable' => false,
-                ],
-                [
-                    'kind' => 'paragraph',
-                    'content' => [PanelView::text('State: '), $badge, PanelView::text('0')],
-                    'tone' => Tone::WARNING,
-                ],
-                [
-                    'kind' => 'emptyState',
-                    'title' => 'Empty',
-                    'paragraphs' => [
-                        ['kind' => 'paragraph', 'content' => [PanelView::text('Plain')], 'tone' => null],
-                        [
-                            'kind' => 'paragraph',
-                            'content' => [PanelView::text('Mixed '), PanelView::code('x')],
-                            'tone' => null,
-                        ],
+                    [0 => ColumnStyle::MONOSPACE],
+                    true,
+                    false,
+                ),
+                new ParagraphBlock(
+                    [PanelView::text('State: '), $badge, PanelView::text('0')],
+                    Tone::WARNING,
+                ),
+                new EmptyStateBlock(
+                    'Empty',
+                    [
+                        new ParagraphBlock([PanelView::text('Plain')], null),
+                        new ParagraphBlock([PanelView::text('Mixed '), PanelView::code('x')], null),
                     ],
-                ],
-                [
-                    'kind' => 'disclosure',
-                    'title' => 'Raw',
-                    'content' => '<data>',
-                ],
-                [
-                    'kind' => 'group',
-                    'label' => 'Nested group',
-                    'content' => $nested,
-                ],
+                ),
+                new DisclosureBlock('Raw', '<data>'),
+                new GroupBlock('Nested group', $nested),
             ],
             $view->blocks(),
             'Content, options, and ordering must survive fluent composition.',
@@ -152,14 +141,8 @@ final class FluentPanelViewTest extends TestCase
     {
         $view = PanelView::create()->overview([0 => 'zero']);
 
-        self::assertSame(
-            [
-                [
-                    'kind' => 'overview',
-                    'fields' => [['label' => '0', 'value' => PanelView::text('zero')]],
-                    'compact' => false,
-                ],
-            ],
+        self::assertEquals(
+            [new OverviewBlock([new FieldEntry('0', PanelView::text('zero'))], false)],
             $view->blocks(),
             'Numeric labels must be converted, not dropped.',
         );
@@ -176,28 +159,23 @@ final class FluentPanelViewTest extends TestCase
             ->paragraph()
             ->emptyState('Empty', 'One', 'Two');
 
-        self::assertSame(
+        self::assertEquals(
             [
-                [
-                    'kind' => 'paragraph',
-                    'content' => [PanelView::text('First '), $badge, PanelView::text(' last')],
-                    'tone' => null,
-                ],
-                ['kind' => 'paragraph', 'content' => [], 'tone' => null],
-                [
-                    'kind' => 'emptyState',
-                    'title' => 'Empty',
-                    'paragraphs' => [
-                        ['kind' => 'paragraph', 'content' => [PanelView::text('One')], 'tone' => null],
-                        ['kind' => 'paragraph', 'content' => [PanelView::text('Two')], 'tone' => null],
+                new ParagraphBlock([PanelView::text('First '), $badge, PanelView::text(' last')], null),
+                new ParagraphBlock([], null),
+                new EmptyStateBlock(
+                    'Empty',
+                    [
+                        new ParagraphBlock([PanelView::text('One')], null),
+                        new ParagraphBlock([PanelView::text('Two')], null),
                     ],
-                ],
+                ),
             ],
             $view->blocks(),
             'Unpacked and empty argument lists must both be accepted.',
         );
-        self::assertSame(
-            [['kind' => 'paragraph', 'content' => [PanelView::text('A'), PanelView::text('B')], 'tone' => null]],
+        self::assertEquals(
+            [new ParagraphBlock([PanelView::text('A'), PanelView::text('B')], null)],
             PanelView::create()->paragraph(first: 'A', second: 'B')->blocks(),
             'Named arguments must not leak keys into the content list.',
         );

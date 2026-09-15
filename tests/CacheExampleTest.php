@@ -42,16 +42,16 @@ final class CacheExampleTest extends TestCase
 
         $collector->shutdown();
 
-        $view = $panel->present($payload);
+        $metrics = $panel->present($payload)->toolbarMetrics();
 
         self::assertSame(
             '3',
-            $view->toolbarMetrics()[0]['value']['value'] ?? null,
+            ($metrics[0] ?? null)?->value,
             'Hits must count every reuse.',
         );
         self::assertSame(
             '2',
-            $view->toolbarMetrics()[1]['value']['value'] ?? null,
+            ($metrics[1] ?? null)?->value,
             'Misses must count both lookups.',
         );
     }
@@ -208,7 +208,7 @@ final class CacheExampleTest extends TestCase
             $collector->capture(),
             'Repeated shutdown must stay idempotent.',
         );
-        self::assertSame(
+        self::assertEquals(
             PanelView::create()
                 ->summary(' hits', 1)
                 ->summary(' misses', 1)
@@ -227,14 +227,16 @@ final class CacheExampleTest extends TestCase
                         ['get', 'example', 'hit'],
                     ],
                     collapsible: true,
-                )
-                ->jsonSerialize(),
-            $panel->present($capture)->jsonSerialize(),
+                ),
+            $panel->present($capture),
             'A stored capture must describe the whole panel.',
         );
+
+        $metrics = $panel->present($capture)->toolbarMetrics();
+
         self::assertSame(
             '1',
-            $panel->present($capture)->toolbarMetrics()[0]['value']['value'] ?? null,
+            ($metrics[0] ?? null)?->value,
             'Hits must reach the toolbar as text.',
         );
         self::assertStringNotContainsString(
