@@ -175,8 +175,9 @@ PanelView::create()
 ```
 
 Plain scalars and `null` become text. `PanelView::text()`, `::strong()`, `::code()`, `::preview()`, `::badge()`, and
-`::value()` produce validated inline values accepted wherever a scalar is accepted. Every method validates its
-arguments and rejects invalid input with an explicit `InvalidArgumentException`.
+`::value()` produce validated inline values accepted wherever a scalar is accepted. Methods with explicit value
+validation reject invalid input with an `InvalidArgumentException`; arguments with incompatible declared types raise
+PHP's native `TypeError`.
 
 The host reads the finished description through `summaryMetrics()`, `toolbarMetrics()`, `blocks()`, and `isActive()`.
 Those accessors return `PHPForge\Debug\Presenter` value objects: `SummaryMetric`, `ToolbarMetric`, and the blocks,
