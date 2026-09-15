@@ -30,7 +30,7 @@
 ## Installation
 
 ```bash
-composer require php-forge/debug:^0.1
+composer require php-forge/debug:^0.2
 ```
 
 The package ships contracts and presentation models only. Its sole requirement is PHP 8.3: it pulls in no framework,
