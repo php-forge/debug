@@ -40,10 +40,6 @@ final class PanelViewTest extends TestCase
             ->overview([])
             ->table([], []);
 
-        self::assertTrue(
-            PanelView::create()->isActive(),
-            'A described panel must be active by default.',
-        );
         self::assertEquals(
             [
                 new HeadingBlock('Title', false),

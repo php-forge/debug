@@ -22,8 +22,8 @@ use function is_string;
  * come from the static factories and are accepted wherever a scalar is accepted.
  *
  * The finished description is a tree of `PHPForge\Debug\Presenter` value objects. The host reads it through
- * {@see self::summaryMetrics()}, {@see self::toolbarMetrics()}, {@see self::blocks()}, and {@see self::isActive()},
- * then narrows each value with `instanceof` over the sealed {@see Block} and {@see Inline} unions.
+ * {@see self::summaryMetrics()}, {@see self::toolbarMetrics()}, and {@see self::blocks()}, then narrows each value
+ * with `instanceof` over the sealed {@see Block} and {@see Inline} unions.
  */
 final readonly class PanelView
 {
@@ -31,26 +31,12 @@ final readonly class PanelView
      * @param list<Presenter\SummaryMetric> $summary Summary metrics in display order.
      * @param list<Presenter\Block> $blocks Panel content blocks in display order.
      * @param list<Presenter\ToolbarMetric> $toolbar Toolbar metrics in display order, separate from the summary.
-     * @param bool $active Whether the panel is marked active for host navigation.
      */
     private function __construct(
         private array $summary,
         private array $blocks,
         private array $toolbar,
-        private bool $active,
     ) {}
-
-    /**
-     * Changes the activity flag without altering content or metrics.
-     *
-     * @param bool $active Whether the panel is marked active for host navigation.
-     *
-     * @return self New view with the requested activity flag.
-     */
-    public function active(bool $active): self
-    {
-        return new self($this->summary, $this->blocks, $this->toolbar, $active);
-    }
 
     /**
      * Creates an inline status label with a semantic tone.
@@ -156,13 +142,13 @@ final readonly class PanelView
     }
 
     /**
-     * Creates an active view without content or metrics as the starting point for fluent composition.
+     * Creates a view without content or metrics as the starting point for fluent composition.
      *
-     * @return self Empty active view.
+     * @return self Empty view.
      */
     public static function create(): self
     {
-        return new self([], [], [], true);
+        return new self([], [], []);
     }
 
     /**
@@ -252,12 +238,12 @@ final readonly class PanelView
     }
 
     /**
-     * Groups only the child's content; metrics and activity belong to the root view.
+     * Groups only the child's content; metrics belong to the root view.
      *
      * @param string $label Accessible group label.
      * @param self $content Child view contributing only its ordered content blocks.
      *
-     * @return self New view with the group appended and the current metrics and activity preserved.
+     * @return self New view with the group appended and the current metrics preserved.
      */
     public function group(string $label, self $content): self
     {
@@ -275,16 +261,6 @@ final readonly class PanelView
     public function heading(string $title, bool $section = false): self
     {
         return $this->append(new Presenter\HeadingBlock($title, $section));
-    }
-
-    /**
-     * Reports whether the panel is marked active for host navigation.
-     *
-     * @return bool Activity flag.
-     */
-    public function isActive(): bool
-    {
-        return $this->active;
     }
 
     /**
@@ -528,7 +504,7 @@ final readonly class PanelView
             $emphasized ? self::strong((string) $value) : self::text((string) $value),
         );
 
-        return new self([...$this->summary, $metric], $this->blocks, $this->toolbar, $this->active);
+        return new self([...$this->summary, $metric], $this->blocks, $this->toolbar);
     }
 
     /**
@@ -596,7 +572,7 @@ final readonly class PanelView
     {
         $metric = new Presenter\ToolbarMetric($label, (string) $value);
 
-        return new self($this->summary, $this->blocks, [...$this->toolbar, $metric], $this->active);
+        return new self($this->summary, $this->blocks, [...$this->toolbar, $metric]);
     }
 
     /**
@@ -639,7 +615,7 @@ final readonly class PanelView
     }
 
     /**
-     * Appends a content block while retaining metrics and activity.
+     * Appends a content block while retaining metrics.
      *
      * @param Presenter\Block $block Content block placed after the existing blocks.
      *
@@ -647,7 +623,7 @@ final readonly class PanelView
      */
     private function append(Presenter\Block $block): self
     {
-        return new self($this->summary, [...$this->blocks, $block], $this->toolbar, $this->active);
+        return new self($this->summary, [...$this->blocks, $block], $this->toolbar);
     }
 
     /**
