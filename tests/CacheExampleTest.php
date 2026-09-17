@@ -252,10 +252,6 @@ final class CacheExampleTest extends TestCase
             $collector->capture(),
             'An observed empty cache is still a capture.',
         );
-        self::assertTrue(
-            $panel->present(['schema' => 1, 'operations' => []])->isActive(),
-            'An empty capture must still open the panel.',
-        );
 
         $collector->shutdown();
     }

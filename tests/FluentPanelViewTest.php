@@ -32,7 +32,6 @@ final class FluentPanelViewTest extends TestCase
         $view = PanelView::create()
             ->summary(' hits', 3)
             ->toolbar('Hits', 3)
-            ->active(false)
             ->overview(['Driver' => 'redis', 'State' => $badge, 'Null' => null, 'Ratio' => 1.5], compact: true)
             ->heading('Entries', section: true)
             ->table(
@@ -88,10 +87,6 @@ final class FluentPanelViewTest extends TestCase
             $view->blocks(),
             'Content, options, and ordering must survive fluent composition.',
         );
-        self::assertFalse(
-            $view->isActive(),
-            'Navigation visibility must remain explicit.',
-        );
     }
 
     public function testDefinitionNeverMutatesAnEarlierView(): void
@@ -99,8 +94,7 @@ final class FluentPanelViewTest extends TestCase
         $base = PanelView::create();
         $nested = PanelView::create()
             ->summary(' ignored', 9)
-            ->toolbar('Ignored', 8)
-            ->active(false);
+            ->toolbar('Ignored', 8);
 
         $view = $base
             ->summary(' hits', 3)
@@ -117,10 +111,6 @@ final class FluentPanelViewTest extends TestCase
             $base->summaryMetrics(),
             'A reusable base view must keep no metrics.',
         );
-        self::assertTrue(
-            $base->isActive(),
-            'A reusable base view must keep its own activity flag.',
-        );
         self::assertCount(
             1,
             $view->summaryMetrics(),
@@ -130,10 +120,6 @@ final class FluentPanelViewTest extends TestCase
             1,
             $view->toolbarMetrics(),
             'Nested metrics must not reach the root toolbar.',
-        );
-        self::assertTrue(
-            $view->isActive(),
-            'Nested activity must not override the root flag.',
         );
     }
 

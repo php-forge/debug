@@ -11,6 +11,10 @@ c3.php
 # composer
 composer.lock
 
+# local notes and scaffold drafts (if present)
+examples/
+internal/
+
 # gitHub copilot config (if present)
 .github/agents/**
 .github/copilot-instructions.md

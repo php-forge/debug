@@ -99,8 +99,7 @@ final class CachePanel extends Panel
 
         $view = PanelView::create()
             ->summary(count($operations) === 1 ? ' operation' : ' operations', count($operations))
-            ->toolbar('Cache', count($operations))
-            ->active($operations !== []);
+            ->toolbar('Cache', count($operations));
 
         return $operations === []
             ? $view->emptyState('No cache operations', 'The cache was observed, but nothing happened.')
@@ -120,36 +119,53 @@ host encodes that array strictly, so omit secrets and keep values JSON-encodable
 
 ## Register it
 
-Merge these fragments into an application whose debugger is already enabled. The collector's `id()` and the panel's
-`ID` must match: that is how the host pairs a capture with its panel.
+Merge these fragments into an application whose debugger is already enabled. The array key is the stable ID: it must
+equal the collector's `id()` and the panel's `ID`, and both hosts reject a mismatch. `TITLE` and `ICON` are only the
+defaults the panel ships with, so the host configuration may override both without touching the class.
 
 ```php
 // Yii2: inside the YII_DEBUG guard. Declare 'modules' => [] in the application configuration so the offset stays
 // typed under PHPStan level max; the guard then only fills in the debug entry.
 $config['modules']['debug'] = [
     'class' => DebugModule::class,
-    'collectors' => ['cache-operations' => new CacheCollector()],
-    'panels' => ['cache-operations' => new CachePanel()],
+    'collectors' => ['cache' => $cacheCollector],
+    'panels' => [
+        'cache' => ['class' => CachePanel::class, 'title' => 'Cache operations', 'icon' => 'db', 'position' => 1],
+    ],
 ];
 ```
 
-```php
-// Yii3: return the extended registry from the application's development DI factory.
-$collector = new CacheCollector();
+A plain `CachePanel::class` string or `new CachePanel()` registers the panel with the provider defaults. Inject the
+same `$cacheCollector` instance into the application service that calls `record()`.
 
-$registry = $registry
-    ->withCollector($collector)
-    ->withPanel(new CachePanel());
+Yii3 reads the same shape from the application configuration, not from a registry object.
+
+```php
+// config/web/params.php
+'yii3/debug' => [
+    'collectors' => ['cache' => CacheCollector::class],
+    'panels' => [
+        'cache' => ['class' => CachePanel::class, 'title' => 'Cache operations', 'icon' => 'db', 'position' => 1],
+    ],
+],
 ```
 
-Both hosts derive the IDs from the objects themselves. `CollectorInterface` is the only collector contract the
-debugger has, so the collector is registered as it is, and only the panel is adapted to the host's own panel type.
-No catalog entry, icon enum, storage dispatch entry, or change to an official package is needed. Inject the same `$collector` into the application service that
-calls `record()`.
+The container resolves `CacheCollector::class`, so the same instance serves the application service and the capture.
+
+Entry options:
+
+- `class`: the collector or panel class, required unless the value is a class string or, in Yii2, an instance.
+- `title`: the panel title, defaulting to the panel's `TITLE` constant.
+- `icon`: a Debug Core icon key, defaulting to the panel's `ICON` constant.
+- `enabled`: set to `false` to skip an entry without installing its package.
+- `position`: order among extensions; unpositioned extensions follow alphabetically.
+
+`CollectorInterface` is the only collector contract the debugger has, so the collector is registered as it is, and
+only the panel is adapted to the host's own panel type. No catalog entry, icon enum, storage dispatch entry, or
+change to an official package is needed.
 
 A runnable version of this example, capturing through PSR-3 instead of a direct call, lives in
-[tests/Support](tests/Support); `python3 tools/check-consumer.py` installs it as an independent Composer package and
-replays a stored capture with no debugger host present.
+[tests/Support](tests/Support).
 
 ## Presentation vocabulary
 
@@ -170,8 +186,7 @@ PanelView::create()
     ->table(['Prop', 'Value'], [['auth', PanelView::value(['id' => 1])]], styles: [0 => ColumnStyle::IDENTIFIER])
     ->group('Component', PanelView::create()->paragraph('Nested content'))
     ->emptyState('No operations', 'The cache was observed, but nothing happened.')
-    ->disclosure('Raw payload', $json)
-    ->active(true);
+    ->disclosure('Raw payload', $json);
 ```
 
 Plain scalars and `null` become text. `PanelView::text()`, `::strong()`, `::code()`, `::preview()`, `::badge()`, and
@@ -179,7 +194,7 @@ Plain scalars and `null` become text. `PanelView::text()`, `::strong()`, `::code
 validation reject invalid input with an `InvalidArgumentException`; arguments with incompatible declared types raise
 PHP's native `TypeError`.
 
-The host reads the finished description through `summaryMetrics()`, `toolbarMetrics()`, `blocks()`, and `isActive()`.
+The host reads the finished description through `summaryMetrics()`, `toolbarMetrics()`, and `blocks()`.
 Those accessors return `PHPForge\Debug\Presenter` value objects: `SummaryMetric`, `ToolbarMetric`, and the blocks,
 entries, and inline values behind them. A renderer narrows each value with `instanceof` over the sealed `Block` and
 `Inline` unions, which static analysis proves exhaustive, and reads its public properties. Inline text carries a
