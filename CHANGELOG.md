@@ -5,9 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.3.0 Under development
+## 0.3.0 September 17, 2026
 
-- refactor(panel)!: remove activity API, document provider defaults, and update README cache/configuration registration.
+- refactor(panel)!: remove activity API, document provider defaults, and update `README.md` cache/configuration registration.
 
 ## 0.2.0 September 15, 2026
 
