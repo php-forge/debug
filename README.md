@@ -207,6 +207,8 @@ method that appends the block laying those entries out, so a panel builds the en
 ```php
 use PHPForge\Debug\{PanelView, Tone};
 
+$wiring = PanelView::create()->links('Depends on 1', PanelView::link('YiiAsset', '#yii-asset'));
+
 PanelView::create()
     ->stats(PanelView::stat('asset', 'bundles', '2'), PanelView::stat('link', 'links', '1', Tone::SUCCESS))
     ->cards(
@@ -217,8 +219,9 @@ PanelView::create()
             'App\\Asset\\',
             [PanelView::badge('1 css', Tone::INFO)],
             PanelView::column('Files', PanelView::create()->files(PanelView::file('.css', 'site.css', Tone::INFO))),
-            PanelView::column('Wiring', PanelView::create()->links('Depends on', PanelView::link('YiiAsset', '#yii'))),
+            PanelView::column('Wiring', $wiring),
         ),
+        PanelView::card('yii-asset', 'asset', 'YiiAsset', 'yii\\web\\', []),
     );
 ```
 
