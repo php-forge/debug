@@ -8,7 +8,8 @@ use InvalidArgumentException;
 use PHPForge\Debug\Exception\PanelViewMessage;
 use PHPForge\Debug\{PanelView, Tone};
 use PHPForge\Debug\Presenter\{
-    CardBlock,
+    CardEntry,
+    CardsBlock,
     ColumnEntry,
     FactEntry,
     FactsBlock,
@@ -45,8 +46,17 @@ final class CompositeBlockTest extends TestCase
 
         $files = PanelView::create()->files(PanelView::file('.css', 'site.css', Tone::INFO));
         $wiring = PanelView::create()->facts(PanelView::fact('SOURCE', '@app/assets'));
-        $view = PanelView::create()
-            ->card(
+
+        self::assertEquals(
+            new CardEntry(
+                'app-asset',
+                'asset',
+                'AppAsset',
+                'App\\Asset\\',
+                [$badge, new TextInline('1 js', TextStyle::PLAIN)],
+                [new ColumnEntry('FILES', $files), new ColumnEntry('WIRING', $wiring)],
+            ),
+            PanelView::card(
                 'app-asset',
                 'asset',
                 'AppAsset',
@@ -54,29 +64,46 @@ final class CompositeBlockTest extends TestCase
                 [$badge, '1 js'],
                 PanelView::column('FILES', $files),
                 PanelView::column('WIRING', $wiring),
-            );
+            ),
+            'A card keeps its meta and columns in declaration order.',
+        );
+
+        $columns = ['files' => PanelView::column('FILES', $files), 'wiring' => PanelView::column('WIRING', $wiring)];
 
         self::assertEquals(
-            [
-                new CardBlock(
-                    'app-asset',
-                    'asset',
-                    'AppAsset',
-                    'App\\Asset\\',
-                    [$badge, new TextInline('1 js', TextStyle::PLAIN)],
-                    [new ColumnEntry('FILES', $files), new ColumnEntry('WIRING', $wiring)],
-                ),
-            ],
-            $view->blocks(),
-            'A card keeps its meta and columns in declaration order.',
+            [new ColumnEntry('FILES', $files), new ColumnEntry('WIRING', $wiring)],
+            PanelView::card('app-asset', 'asset', 'AppAsset', '', [], ...$columns)->columns,
+            'String keys must not reach the column list.',
+        );
+    }
+
+    public function testCardsKeepTheirEntriesInDeclarationOrder(): void
+    {
+        $app = PanelView::card('app-asset', 'asset', 'AppAsset', '', []);
+        $yii = PanelView::card('yii-asset', 'asset', 'YiiAsset', '', []);
+
+        $cards = ['app' => $app, 'yii' => $yii];
+
+        self::assertEquals(
+            [new CardsBlock([$app, $yii]), new CardsBlock([])],
+            PanelView::create()
+                ->cards($app, $yii)
+                ->cards()
+                ->blocks(),
+            'A card set keeps its cards in declaration order.',
+        );
+        self::assertEquals(
+            [new CardsBlock([$app, $yii])],
+            PanelView::create()->cards(...$cards)->blocks(),
+            'String keys must not reach the card list.',
         );
     }
 
     public function testCardWithoutMetaOrColumnsCarriesEmptyLists(): void
     {
         self::assertEquals(
-            [new CardBlock('', '', 'AppAsset', '', [], [])],
-            PanelView::create()->card('', '', 'AppAsset', '', [])->blocks(),
+            new CardEntry('', '', 'AppAsset', '', [], []),
+            PanelView::card('', '', 'AppAsset', '', []),
             'An unadorned card keeps its optional parts empty.',
         );
     }
@@ -89,6 +116,14 @@ final class CompositeBlockTest extends TestCase
                 ->facts(PanelView::fact('Charset', 'UTF-8'), PanelView::fact('Language', 'en'))
                 ->blocks(),
             'A fact strip keeps every pair in declaration order.',
+        );
+
+        $facts = ['charset' => PanelView::fact('Charset', 'UTF-8')];
+
+        self::assertEquals(
+            [new FactsBlock([new FactEntry('Charset', 'UTF-8')])],
+            PanelView::create()->facts(...$facts)->blocks(),
+            'String keys must not reach the fact list.',
         );
     }
 
@@ -118,6 +153,14 @@ final class CompositeBlockTest extends TestCase
                 ->blocks(),
             'A file list keeps every entry in declaration order.',
         );
+
+        $files = ['site' => PanelView::file('.css', 'site.css', Tone::INFO)];
+
+        self::assertEquals(
+            [new FilesBlock([new FileEntry('.css', 'site.css', Tone::INFO)])],
+            PanelView::create()->files(...$files)->blocks(),
+            'String keys must not reach the file list.',
+        );
     }
 
     public function testLinksKeepTheirLabelAndOrder(): void
@@ -143,6 +186,14 @@ final class CompositeBlockTest extends TestCase
                 ->blocks(),
             'A link strip keeps every target in declaration order.',
         );
+
+        $links = ['yii' => PanelView::link('YiiAsset', '#yii-asset')];
+
+        self::assertEquals(
+            [new LinksBlock('Depends on 1', [new LinkInline('YiiAsset', '#yii-asset', false)])],
+            PanelView::create()->links('Depends on 1', ...$links)->blocks(),
+            'String keys must not reach the link list.',
+        );
     }
 
     public function testManifestGroupsPackagesUnderOneVendorLabel(): void
@@ -163,6 +214,14 @@ final class CompositeBlockTest extends TestCase
             $view->blocks(),
             'A manifest keeps its packages in declaration order under the vendor label.',
         );
+
+        $packages = ['aliases' => PanelView::package('aliases', 'v3.1.1')];
+
+        self::assertEquals(
+            [new ManifestBlock('yiisoft/', [new PackageEntry('aliases', 'v3.1.1')])],
+            PanelView::create()->manifest('yiisoft/', ...$packages)->blocks(),
+            'String keys must not reach the package list.',
+        );
     }
 
     public function testPillsKeepTheirStateAndOrder(): void
@@ -176,6 +235,14 @@ final class CompositeBlockTest extends TestCase
             [new PillsBlock([new PillEntry('APCu', 'on', true), new PillEntry('Memcache', 'off', false)])],
             $view->blocks(),
             'A pill strip keeps every subject with its own state.',
+        );
+
+        $pills = ['apcu' => PanelView::pill('APCu', 'on', true)];
+
+        self::assertEquals(
+            [new PillsBlock([new PillEntry('APCu', 'on', true)])],
+            PanelView::create()->pills(...$pills)->blocks(),
+            'String keys must not reach the pill list.',
         );
     }
 
@@ -192,6 +259,14 @@ final class CompositeBlockTest extends TestCase
                 ->readouts(PanelView::readout('PHP', '8.5.9', 'runtime'))
                 ->blocks(),
             'A readout row carries its cards in declaration order.',
+        );
+
+        $readouts = ['php' => PanelView::readout('PHP', '8.5.9', 'runtime')];
+
+        self::assertEquals(
+            [new ReadoutsBlock([new ReadoutEntry('PHP', '8.5.9', 'runtime')])],
+            PanelView::create()->readouts(...$readouts)->blocks(),
+            'String keys must not reach the readout list.',
         );
     }
 
@@ -248,6 +323,6 @@ final class CompositeBlockTest extends TestCase
             PanelViewMessage::INLINE_CONTENT_INVALID->getMessage('stdClass'),
         );
 
-        PanelView::create()->card('', '', 'AppAsset', '', [new stdClass()]);
+        PanelView::card('', '', 'AppAsset', '', [new stdClass()]);
     }
 }

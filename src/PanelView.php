@@ -77,7 +77,7 @@ final readonly class PanelView
     }
 
     /**
-     * Appends a card describing one entity, optionally split into titled columns of its own content.
+     * Creates one card describing an entity, optionally split into titled columns of its own content.
      *
      * @param string $id Anchor the host emits so other blocks can link to the card, or `''` to omit it.
      * @param string $icon Host icon key shown before the title, or `''` to omit it.
@@ -88,32 +88,42 @@ final readonly class PanelView
      *
      * @throws InvalidArgumentException if a meta value is not an accepted inline value.
      *
-     * @return self New view with the card appended.
+     * @return Presenter\CardEntry Card entry accepted by {@see self::cards()}.
      */
-    public function card(
+    public static function card(
         string $id,
         string $icon,
         string $title,
         string $subtitle,
         array $meta,
         Presenter\ColumnEntry ...$columns
-    ): self {
+    ): Presenter\CardEntry {
         $inline = [];
 
         foreach ($meta as $value) {
             $inline[] = self::inline($value);
         }
 
-        return $this->append(
-            new Presenter\CardBlock(
-                $id,
-                $icon,
-                $title,
-                $subtitle,
-                $inline,
-                array_values($columns),
-            ),
+        return new Presenter\CardEntry(
+            $id,
+            $icon,
+            $title,
+            $subtitle,
+            $inline,
+            array_values($columns),
         );
+    }
+
+    /**
+     * Appends a set of entity cards the host lays out together.
+     *
+     * @param Presenter\CardEntry ...$cards Entries produced by {@see self::card()}.
+     *
+     * @return self New view with the card set appended.
+     */
+    public function cards(Presenter\CardEntry ...$cards): self
+    {
+        return $this->append(new Presenter\CardsBlock(array_values($cards)));
     }
 
     /**

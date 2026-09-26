@@ -173,6 +173,11 @@ Five types are published for panel authors: `CollectorInterface`, `Panel`, `Pane
 Everything a panel can display is a `PanelView` method, so an extension imports no value class and builds nothing by
 hand.
 
+### Everyday vocabulary
+
+Most panels need only these methods: metrics, headings, prose, a label and value overview, tables, groups, empty
+states, and raw payloads.
+
 ```php
 use PHPForge\Debug\{ColumnStyle, PanelView, Tone};
 
@@ -181,18 +186,64 @@ PanelView::create()
     ->toolbar('Props', 2)
     ->heading('Props', section: true)
     ->overview(['Component' => 'Site', 'State' => PanelView::badge('shared', Tone::INFO)])
-    ->paragraph('Rendered by ', PanelView::code('Inertia::render()'))
-    ->callout(Tone::WARNING, 'Runtime inspection is unavailable.')
+    ->paragraph('Rendered by ', PanelView::code('Inertia::render()'), ' in ', PanelView::strong('SiteController'))
+    ->callout(Tone::WARNING, 'Runtime inspection is unavailable. ', PanelView::link('Read more', '/docs/inertia'))
     ->table(['Prop', 'Value'], [['auth', PanelView::value(['id' => 1])]], styles: [0 => ColumnStyle::IDENTIFIER])
-    ->group('Component', PanelView::create()->paragraph('Nested content'))
+    ->group('Component', PanelView::create()->paragraph(PanelView::text('Nested content')))
     ->emptyState('No operations', 'The cache was observed, but nothing happened.')
     ->disclosure('Raw payload', $json);
 ```
 
-Plain scalars and `null` become text. `PanelView::text()`, `::strong()`, `::code()`, `::preview()`, `::badge()`, and
-`::value()` produce validated inline values accepted wherever a scalar is accepted. Methods with explicit value
+Plain scalars and `null` become text. `PanelView::text()`, `::strong()`, `::code()`, `::badge()`, `::value()`, and
+`::link()` produce validated inline values accepted wherever a scalar is accepted. Methods with explicit value
 validation reject invalid input with an `InvalidArgumentException`; arguments with incompatible declared types raise
 PHP's native `TypeError`.
+
+### Extended vocabulary
+
+Denser layouts for inventories and dashboards. Each collection pairs a static factory that creates one entry with a
+method that appends the block laying those entries out, so a panel builds the entries first and appends them once.
+
+```php
+use PHPForge\Debug\{PanelView, Tone};
+
+$wiring = PanelView::create()->links('Depends on 1', PanelView::link('YiiAsset', '#yii-asset'));
+
+PanelView::create()
+    ->stats(PanelView::stat('asset', 'bundles', '2'), PanelView::stat('link', 'links', '1', Tone::SUCCESS))
+    ->cards(
+        PanelView::card(
+            'app-asset',
+            'asset',
+            'AppAsset',
+            'App\\Asset\\',
+            [PanelView::badge('1 css', Tone::INFO)],
+            PanelView::column('Files', PanelView::create()->files(PanelView::file('.css', 'site.css', Tone::INFO))),
+            PanelView::column('Wiring', $wiring),
+        ),
+        PanelView::card('yii-asset', 'asset', 'YiiAsset', 'yii\\web\\', []),
+    );
+```
+
+Every method below is exercised by a built-in panel of `php-forge/debug-core`, except the two reserved for portable
+query and trace panels:
+
+| Method                            | Presents                                                    | Used by                   |
+| --------------------------------- | ----------------------------------------------------------- | ------------------------- |
+| `section()`                       | A titled section wrapping its own content.                  | Config                    |
+| `stats()` / `stat()`              | A strip of headline stat tiles.                             | Asset                     |
+| `readouts()` / `readout()`        | A row of headline readout cards.                            | Config                    |
+| `facts()` / `fact()`              | A compact strip of label and value pairs.                   | Asset, Config             |
+| `pills()` / `pill()`              | A strip of on/off status pills.                             | Config                    |
+| `files()` / `file()`              | A list of typed file names.                                 | Asset                     |
+| `manifest()` / `package()`        | A vendor-grouped package roster.                            | Config                    |
+| `links()`                         | A labeled strip of `link()` targets.                        | Asset                     |
+| `cards()` / `card()` / `column()` | A grid of entity cards, each split into titled columns.     | Asset                     |
+| `preview()`                       | Inline text the host clamps behind its expand control.      | User                      |
+| `sql()`                           | Inline text the host highlights as an SQL statement.        | No built-in emits it yet. |
+| `trace()`                         | Captured call-site frames the host renders as source links. | No built-in emits it yet. |
+
+### Reading a description
 
 The host reads the finished description through `summaryMetrics()`, `toolbarMetrics()`, and `blocks()`.
 Those accessors return `PHPForge\Debug\Presenter` value objects: `SummaryMetric`, `ToolbarMetric`, and the blocks,
