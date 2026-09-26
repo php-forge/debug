@@ -40,6 +40,7 @@ final readonly class TraceInline implements Inline
             $fields = [];
 
             foreach ($frame as $key => $value) {
+                // @infection-ignore-all: numeric keys are stored as ints anyway; the cast only narrows the static type.
                 $fields[(string) $key] = $value;
             }
 

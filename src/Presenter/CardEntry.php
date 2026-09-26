@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace PHPForge\Debug\Presenter;
 
 /**
- * Represents a card describing one entity, optionally split into titled columns of its own content.
+ * Represents one card describing an entity, optionally split into titled columns of its own content.
  */
-final readonly class CardBlock implements Block
+final readonly class CardEntry
 {
     /**
      * @param string $id Anchor the host emits so other blocks can link to the card, or `''` to omit it.
