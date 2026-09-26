@@ -274,6 +274,30 @@ final readonly class PanelView
     }
 
     /**
+     * Appends the header identifying the subject the panel describes.
+     *
+     * Use it once, first, when the panel is about one subject, such as the signed-in user; the status badge tone also
+     * colors the header accent.
+     *
+     * @param string $mark Short text drawn as an avatar before the title, such as initials, or `''` to omit it.
+     * @param string $title Subject name, also announced as the accessible name of the header; the host escapes it.
+     * @param string $subtitle Qualifier shown under the title, or `''` to omit it; the host escapes it.
+     * @param Presenter\BadgeInline|null $status Badge produced by {@see self::badge()}, or `null` for a neutral header.
+     * @param Presenter\FactEntry ...$metrics Entries produced by {@see self::fact()}, shown as one metric row.
+     *
+     * @return self New view with the header appended.
+     */
+    public function hero(
+        string $mark,
+        string $title,
+        string $subtitle,
+        Presenter\BadgeInline|null $status,
+        Presenter\FactEntry ...$metrics,
+    ): self {
+        return $this->append(new Presenter\HeroBlock($mark, $title, $subtitle, $status, array_values($metrics)));
+    }
+
+    /**
      * Creates an inline navigation link the host renders as an anchor.
      *
      * Only relative targets and the `http`, `https`, and `mailto` schemes are accepted, so a captured value can never

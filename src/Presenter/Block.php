@@ -10,7 +10,7 @@ namespace PHPForge\Debug\Presenter;
  * The union is sealed, so a host narrows a block with `instanceof` and static analysis proves that no case is left
  * unhandled.
  *
- * @phpstan-sealed CardsBlock|DisclosureBlock|EmptyStateBlock|FactsBlock|FilesBlock|GroupBlock|HeadingBlock|LinksBlock
- *   |ManifestBlock|OverviewBlock|ParagraphBlock|PillsBlock|ReadoutsBlock|SectionBlock|StatsBlock|TableBlock
+ * @phpstan-sealed CardsBlock|DisclosureBlock|EmptyStateBlock|FactsBlock|FilesBlock|GroupBlock|HeadingBlock|HeroBlock
+ *   |LinksBlock|ManifestBlock|OverviewBlock|ParagraphBlock|PillsBlock|ReadoutsBlock|SectionBlock|StatsBlock|TableBlock
  */
 interface Block {}

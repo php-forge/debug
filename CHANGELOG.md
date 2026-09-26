@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.4.1 Under development
 
+- feat(panel-view): add `hero()` for `HeroBlock`, the header naming the subject a panel describes with its status badge and metric row; update `README.md`.
+
 ## 0.4.0 September 25, 2026
 
 - feat(panel-view)!: make `card()` a static `CardEntry` factory; add `cards()` for `CardsBlock`; update renderers and `README.md`.

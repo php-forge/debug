@@ -225,12 +225,29 @@ PanelView::create()
     );
 ```
 
+A panel about one subject opens with `hero()`: the mark and title, a status badge whose tone also colors the header
+accent, and one row of `fact()` metrics.
+
+```php
+use PHPForge\Debug\{PanelView, Tone};
+
+PanelView::create()->hero(
+    'AD',
+    'admin',
+    'admin@example.com',
+    PanelView::badge('Active', Tone::SUCCESS),
+    PanelView::fact('User ID', '1'),
+    PanelView::fact('Roles', 'admin'),
+);
+```
+
 Every method below is exercised by a built-in panel of `php-forge/debug-core`, except the two reserved for portable
 query and trace panels:
 
 | Method                            | Presents                                                    | Used by                   |
 | --------------------------------- | ----------------------------------------------------------- | ------------------------- |
-| `section()`                       | A titled section wrapping its own content.                  | Config                    |
+| `hero()`                          | The header naming the subject, its status, and metrics.     | User                      |
+| `section()`                       | A titled section wrapping its own content.                  | Config, User              |
 | `stats()` / `stat()`              | A strip of headline stat tiles.                             | Asset                     |
 | `readouts()` / `readout()`        | A row of headline readout cards.                            | Config                    |
 | `facts()` / `fact()`              | A compact strip of label and value pairs.                   | Asset, Config             |
