@@ -225,20 +225,20 @@ PanelView::create()
 Every method below is exercised by a built-in panel of `php-forge/debug-core`, except the two reserved for portable
 query and trace panels:
 
-| Method | Presents | Used by |
-| --- | --- | --- |
-| `section()` | A titled section wrapping its own content. | Config |
-| `stats()` / `stat()` | A strip of headline stat tiles. | Asset |
-| `readouts()` / `readout()` | A row of headline readout cards. | Config |
-| `facts()` / `fact()` | A compact strip of label and value pairs. | Asset, Config |
-| `pills()` / `pill()` | A strip of on/off status pills. | Config |
-| `files()` / `file()` | A list of typed file names. | Asset |
-| `manifest()` / `package()` | A vendor-grouped package roster. | Config |
-| `links()` | A labeled strip of `link()` targets. | Asset |
-| `cards()` / `card()` / `column()` | A grid of entity cards, each split into titled columns. | Asset |
-| `preview()` | Inline text the host clamps behind its expand control. | User |
-| `sql()` | Inline text the host highlights as an SQL statement. | No built-in emits it yet. |
-| `trace()` | Captured call-site frames the host renders as source links. | No built-in emits it yet. |
+| Method                            | Presents                                                    | Used by                   |
+| --------------------------------- | ----------------------------------------------------------- | ------------------------- |
+| `section()`                       | A titled section wrapping its own content.                  | Config                    |
+| `stats()` / `stat()`              | A strip of headline stat tiles.                             | Asset                     |
+| `readouts()` / `readout()`        | A row of headline readout cards.                            | Config                    |
+| `facts()` / `fact()`              | A compact strip of label and value pairs.                   | Asset, Config             |
+| `pills()` / `pill()`              | A strip of on/off status pills.                             | Config                    |
+| `files()` / `file()`              | A list of typed file names.                                 | Asset                     |
+| `manifest()` / `package()`        | A vendor-grouped package roster.                            | Config                    |
+| `links()`                         | A labeled strip of `link()` targets.                        | Asset                     |
+| `cards()` / `card()` / `column()` | A grid of entity cards, each split into titled columns.     | Asset                     |
+| `preview()`                       | Inline text the host clamps behind its expand control.      | User                      |
+| `sql()`                           | Inline text the host highlights as an SQL statement.        | No built-in emits it yet. |
+| `trace()`                         | Captured call-site frames the host renders as source links. | No built-in emits it yet. |
 
 ### Reading a description
 
