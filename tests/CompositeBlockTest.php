@@ -15,6 +15,7 @@ use PHPForge\Debug\Presenter\{
     FactsBlock,
     FileEntry,
     FilesBlock,
+    HeroBlock,
     LinkInline,
     LinksBlock,
     ManifestBlock,
@@ -34,8 +35,8 @@ use PHPUnit\Framework\TestCase;
 use stdClass;
 
 /**
- * Unit tests for the {@see PanelView} composite blocks describing cards, stats, files, links, facts, readouts, pills,
- * manifests, and sections.
+ * Unit tests for the {@see PanelView} composite blocks describing heroes, cards, stats, files, links, facts, readouts,
+ * pills, manifests, and sections.
  */
 #[Group('panel-view')]
 final class CompositeBlockTest extends TestCase
@@ -160,6 +161,32 @@ final class CompositeBlockTest extends TestCase
             [new FilesBlock([new FileEntry('.css', 'site.css', Tone::INFO)])],
             PanelView::create()->files(...$files)->blocks(),
             'String keys must not reach the file list.',
+        );
+    }
+
+    public function testHeroKeepsItsIdentityStatusAndMetricOrder(): void
+    {
+        $status = PanelView::badge('Active', Tone::SUCCESS);
+
+        $metrics = ['id' => PanelView::fact('User ID', '1'), 'roles' => PanelView::fact('Roles', 'admin')];
+
+        self::assertEquals(
+            [
+                new HeroBlock(
+                    'AD',
+                    'admin',
+                    'admin@example.com',
+                    $status,
+                    [new FactEntry('User ID', '1'), new FactEntry('Roles', 'admin')],
+                ),
+            ],
+            PanelView::create()->hero('AD', 'admin', 'admin@example.com', $status, ...$metrics)->blocks(),
+            'Metrics must keep declaration order without their string keys.',
+        );
+        self::assertEquals(
+            [new HeroBlock('', 'admin', '', null, [])],
+            PanelView::create()->hero('', 'admin', '', null)->blocks(),
+            'A neutral header keeps its optional parts empty.',
         );
     }
 
