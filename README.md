@@ -12,14 +12,14 @@
     <a href="https://github.com/php-forge/debug/actions/workflows/build.yml" target="_blank">
         <img src="https://img.shields.io/github/actions/workflow/status/php-forge/debug/build.yml?style=for-the-badge&label=PHPUnit&logo=github" alt="PHPUnit">
     </a>
+    <a href="https://codecov.io/github/php-forge/debug" target="_blank">
+        <img src="https://img.shields.io/codecov/c/github/php-forge/debug.svg?style=for-the-badge&logo=codecov&logoColor=white&label=Coverage" alt="Coverage">
+    </a>
     <a href="https://dashboard.stryker-mutator.io/reports/github.com/php-forge/debug/main" target="_blank">
         <img src="https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fphp-forge%2Fdebug%2Fmain" alt="Mutation Testing">
     </a>
     <a href="https://github.com/php-forge/debug/actions/workflows/static.yml" target="_blank">
         <img src="https://img.shields.io/github/actions/workflow/status/php-forge/debug/static.yml?style=for-the-badge&label=PHPStan&logo=github" alt="PHPStan">
-    </a>
-    <a href="https://github.com/php-forge/debug/actions/workflows/security.yml" target="_blank">
-        <img src="https://img.shields.io/github/actions/workflow/status/php-forge/debug/security.yml?style=for-the-badge&label=Security&logo=github" alt="Security">
     </a>
 </p>
 
@@ -281,7 +281,20 @@ $html = match (true) {
 
 ## Documentation
 
-- [Testing guide](docs/testing.md)
+- 🧪 [Testing guide](https://github.com/php-forge/debug/blob/main/docs/testing.md)
+
+## AI assistance
+
+AI agents: read the [documentation index](https://yii2-framework.github.io/docs/llms.txt) and fetch the Markdown version
+of a page by appending `index.md` to its URL. The
+[AI agents guide](https://github.com/yii2-framework/docs/blob/main/src/content/docs/project/ai-agents.md) covers skill
+installation, client setup and verification.
+
+- 🤖 [`php-forge-debug` skill](https://github.com/php-forge/debug/blob/main/docs/agents.md): portable collectors,
+  declarative panels built with `PanelView`, and the presentation value objects a host renders.
+
+See the [repository guides](#documentation), the [skill source](skills/php-forge-debug/SKILL.md), the source PHPDoc and
+the [changelog](CHANGELOG.md).
 
 ## Package information
 
@@ -292,9 +305,19 @@ $html = match (true) {
 
 ## Code quality
 
-[![Codecov](https://img.shields.io/codecov/c/github/php-forge/debug.svg?style=for-the-badge&logo=codecov&logoColor=white&label=Coverage)](https://codecov.io/gh/php-forge/debug)
 [![Quality](https://img.shields.io/github/actions/workflow/status/php-forge/debug/quality.yml?style=for-the-badge&label=Quality&logo=github)](https://github.com/php-forge/debug/actions/workflows/quality.yml)
-[![StyleCI](https://img.shields.io/badge/StyleCI-Passed-44CC11.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.styleci.io/repos/php-forge/debug?branch=main)
+[![StyleCI](https://img.shields.io/badge/dynamic/xml?url=https%3A%2F%2Fgithub.styleci.io%2Frepos%2F1363905740%2Fshield%3Fbranch%3Dmain&query=%2F%2F*%5Blocal-name%28%29%3D%27text%27%5D%5B2%5D&label=StyleCI&style=for-the-badge&logo=github&logoColor=white&color=4F5D95)](https://github.styleci.io/repos/1363905740?branch=main)
+
+## Security
+
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/php-forge/debug/badge?style=for-the-badge)](https://scorecard.dev/viewer/?uri=github.com/php-forge/debug)
+[![Zizmor](https://img.shields.io/github/actions/workflow/status/php-forge/debug/security.yml?style=for-the-badge&label=Zizmor&logo=github)](https://github.com/php-forge/debug/actions/workflows/security.yml)
+
+## Built with AI
+
+[![Built with Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-D97757.svg?style=for-the-badge&logo=claude&logoColor=white)](https://claude.com/claude-code)
+[![Built with Codex](https://img.shields.io/badge/Built%20with-Codex-10A37F.svg?style=for-the-badge&logo=openaigym&logoColor=white)](https://openai.com/codex)
+[![Reviewed by CodeRabbit](https://img.shields.io/badge/Reviewed%20by-CodeRabbit-FF570A.svg?style=for-the-badge&logo=coderabbit&logoColor=white)](https://www.coderabbit.ai)
 
 ## Social networks
 

@@ -22,21 +22,36 @@
 *.ttf  binary
 
 # Exclude files from the archive
+.env export-ignore
+.env.* export-ignore
+.env.example -export-ignore
+.agents                        export-ignore
+.claude                        export-ignore
+/.codex                         export-ignore
+/.config                        export-ignore
 /.editorconfig                  export-ignore
 /.gitattributes                 export-ignore
 /.github                        export-ignore
 /.gitignore                     export-ignore
+/.phpunit.cache                 export-ignore
+/.phpunit.result.cache          export-ignore
+/.stryker-tmp                   export-ignore
 /.styleci.yml                   export-ignore
 /codeception.yml                export-ignore
 /composer-require-checker.json  export-ignore
+/composer.lock                  export-ignore
 /docs                           export-ignore
 /ecs.php                        export-ignore
 /infection.json*                export-ignore
+/internal                       export-ignore
+/node_modules                   export-ignore
 /phpstan*.neon*                 export-ignore
 /phpunit.xml.dist               export-ignore
 /rector.php                     export-ignore
+/reports/mutation               export-ignore
 /runtime                        export-ignore
 /tests                          export-ignore
+/vendor                         export-ignore
 
 # Avoid merge conflicts in CHANGELOG
 # https://about.gitlab.com/2015/02/10/gitlab-reduced-merge-conflicts-by-90-percent-with-changelog-placeholders/

@@ -1,6 +1,12 @@
-# AI agents (if present)
-.codex
+.agents
 .claude
+
+# artifacts (if present)
+artifacts
+
+# Local AI agent, editor, and GitHub CLI config (if present)
+.codex
+.config/gh
 
 # codecoverage (if present)
 code_coverage
@@ -11,11 +17,7 @@ c3.php
 # composer
 composer.lock
 
-# local notes and scaffold drafts (if present)
-examples/
-internal/
-
-# gitHub copilot config (if present)
+# GitHub Copilot config (if present)
 .github/agents/**
 .github/copilot-instructions.md
 .github/copilot/**
@@ -31,18 +33,25 @@ nbproject
 
 # node_modules (if present)
 node_modules
-package-lock.json
-!src/assets/package-lock.json
-
-# phpactor (if present)
-.phpactor.*
 
 # phpstorm project (if present)
 .idea
 
+# phpactor (if present)
+.phpactor.*
+
 # phpunit (if present)
 .phpunit.cache
 .phpunit.result.cache
+
+# Private maintainer files (if present)
+/internal/
+
+# Report (if present)
+reports
+
+# Stryker (if present)
+.stryker-tmp
 
 # vagrant (if present)
 .vagrant
@@ -60,3 +69,8 @@ Thumbs.db
 .buildpath
 .project
 .settings
+
+# Local environment files
+.env
+.env.*
+!.env.example
