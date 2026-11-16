@@ -22,21 +22,26 @@
 *.ttf  binary
 
 # Exclude files from the archive
-.env export-ignore
-.env.* export-ignore
-.env.example -export-ignore
-.agents                        export-ignore
-.claude                        export-ignore
+.agents                         export-ignore
+.claude                         export-ignore
+.env                            export-ignore
+.env.*                          export-ignore
+.env.example                    export-ignore
 /.codex                         export-ignore
 /.config                        export-ignore
 /.editorconfig                  export-ignore
 /.gitattributes                 export-ignore
 /.github                        export-ignore
 /.gitignore                     export-ignore
+/.nvmrc                         export-ignore
 /.phpunit.cache                 export-ignore
-/.phpunit.result.cache          export-ignore
+/.prettierignore                export-ignore
+/.prettierrc.json               export-ignore
 /.stryker-tmp                   export-ignore
 /.styleci.yml                   export-ignore
+/.vscode                        export-ignore
+/artifacts                      export-ignore
+/code_coverage                  export-ignore
 /codeception.yml                export-ignore
 /composer-require-checker.json  export-ignore
 /composer.lock                  export-ignore
@@ -48,7 +53,7 @@
 /phpstan*.neon*                 export-ignore
 /phpunit.xml.dist               export-ignore
 /rector.php                     export-ignore
-/reports/mutation               export-ignore
+/reports                        export-ignore
 /runtime                        export-ignore
 /tests                          export-ignore
 /vendor                         export-ignore
