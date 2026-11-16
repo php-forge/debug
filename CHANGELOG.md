@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.4.2 Under development
 
+- docs: add the `php-forge-debug` skill with AI assistance guidance; add Security and Built with AI sections; update `README.md` badges.
+
 ## 0.4.1 September 26, 2026
 
 - feat(panel-view): add `hero()` for `HeroBlock`, the header naming the subject a panel describes with its status badge and metric row; update `README.md`.

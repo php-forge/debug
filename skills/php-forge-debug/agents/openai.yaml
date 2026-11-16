@@ -1,0 +1,4 @@
+interface:
+  display_name: "PHP Forge Debug"
+  short_description: "Build portable debug collectors and panels"
+  default_prompt: "Use $php-forge-debug to implement a collector and its matching declarative panel."
