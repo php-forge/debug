@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - docs: add the `php-forge-debug` skill with AI assistance guidance; add Security and Built with AI sections; update `README.md` badges.
 - fix(.gitattributes): reorder text file patterns for consistency.
 - chore: standardize comments in configuration files and update dependency ignore rules.
+- fix: restore BSD-3-Clause detection without changing license terms.
 
 ## 0.4.1 September 26, 2026
 
